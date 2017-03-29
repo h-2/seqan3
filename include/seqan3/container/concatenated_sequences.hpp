@@ -36,8 +36,9 @@
 
 #pragma once
 
-#include <vector>
+#include <any>
 #include <type_traits>
+#include <vector>
 
 #include <range/v3/view/drop.hpp>
 #include <range/v3/view/take.hpp>
@@ -48,31 +49,36 @@ namespace seqan3
 {
 /*!\file concatenated_sequences.hpp
  * \ingroup container
- * \brief Contains \ref concatenated_sequences
+ * \brief Contains concatenated_sequences
  */
 
-/*! \brief Container that stores sequences concatenated internally.
- * \tparam inner_type The type of sequences that will be stored. Must satisfy \ref random_access_sequence_concept
+/*!\brief Container that stores sequences concatenated internally.
+ * \tparam inner_type The type of sequences that will be stored. Must satisfy seqan3::random_access_sequence_concept
  * \todo add complexity to function documentation
  */
 template <typename inner_type,
-          typename delimiters_type = std::vector<typename inner_type::size_type>>
+          typename data_delimiters_type = std::vector<typename inner_type::size_type>>
     requires random_access_sequence_concept<inner_type>
-    //TODO add requirements on delimiters_type
+    //TODO add requirements on data_delimiters_type
 class concatenated_sequences
 {
+protected:
+     //!\privatesection
+    std::decay_t<inner_type> data_values;
+    data_delimiters_type data_delimiters;
 public:
-    using value_type = ranges::any_random_access_view<typename inner_type::reference>;
-    using reference = value_type;
-    using const_reference = value_type const;
-//     using iterator = detail::ra_iterator<concatenated_sequences>; //TODO must satisfy forward_iterator_concept and convertible to const_interator
-//     using const_iterator = detail::ra_const_iterator<concatenated_sequences>; //TODO must satisfy forward_iterator_concept
+    //!\publicsection
+    using value_type = std::decay_t<inner_type>;
+    using reference = decltype(data_values | ranges::view::slice(0, 1));
+    using const_reference = decltype(data_values | ranges::view::slice(0, 1) | ranges::view::const_);
+    using iterator = std::any;//detail::ra_iterator<concatenated_sequences>;
+    using const_iterator = std::any;//detail::ra_const_iterator<concatenated_sequences>;
     using difference_type = size_t;
     using size_type = size_t; // TODO must be the same as iterator_traits::difference_type for iterator and const_iterator
 
 
     /* rule of six */
-    //!\name Rule of Six constructors and destructor
+    //!\name Constructors, destructor and assignment operators
     //!\{
     concatenated_sequences()
     {
@@ -83,51 +89,74 @@ public:
     concatenated_sequences & operator=(concatenated_sequences const &) = default;
     concatenated_sequences & operator=(concatenated_sequences &&) = default;
     ~concatenated_sequences() = default;
-    //!\}
 
 
-
-        template <typename type>
-        requires input_range_concept<std::decay_t<type>> //&&
-//                  std::is_same_v<std::decay_t<type>::value_type, inner_type>
+    template <typename type>
+        requires input_range_concept<std::decay_t<type>> &&
+                 std::is_same_v<std::decay_t<typename type::value_type>, value_type>
     concatenated_sequences & operator=(type const & in)
     {
         clear();
 
         // benchmark between using join and insert
-        data = in | ranges::view::join;
+        data_values = in | ranges::view::join;
 
         for (auto const & val : in)
         {
-//             data.insert(data.end(), val.begin(), val.end());
-            delimiters.push_back(delimiters.back() + val.size());
+//             data_values.insert(data_values.end(), val.begin(), val.end());
+            data_delimiters.push_back(data_delimiters.back() + val.size());
         }
-
+        std::cout << data_values << '\n';
+        for (auto && i : data_delimiters)
+            std::cout << i << ", ";
+        std::cout << '\n';
         return *this;
     }
+    //!\}
 
+    /*!\name Iterators
+     * \{
+     */
+    /*!\brief Returns an iterator to the first element of the container.
+     * \returns Iterator to the first element.
+     *
+     * If the container is empty, the returned iterator will be equal to end().
+     */
+    iterator begin() const noexcept
+    {
+        return iterator{*this};
+    }
 
-//     iterator begin() const
-//     {
-//         return iterator{*this};
-//     }
-//
-//     const_iterator cbegin() const
-//     {
-//         return const_iterator{*this};
-//     }
-//
-//     iterator end() const
-//     {
-//         return iterator{*this, true};
-//     }
-//
-//     const_iterator cend() const
-//     {
-//         return const_iterator{*this, true};
-//     }
+    /*!\brief Returns an iterator to the first element of the container.
+     * \returns Iterator to the first element.
+     *
+     * If the container is empty, the returned iterator will be equal to end().
+     */
+    const_iterator cbegin() const noexcept
+    {
+        return const_iterator{*this};
+    }
 
+    /*!\brief Returns an iterator to the element following the last element of the container.
+     * \returns Iterator to the first element.
+     *
+     * This element acts as a placeholder; attempting to access it results in undefined behavior.
+     */
+    iterator end() const noexcept
+    {
+        return iterator{*this, true};
+    }
 
+    /*!\brief Returns an iterator to the element following the last element of the container.
+     * \returns Iterator to the first element.
+     *
+     * This element acts as a placeholder; attempting to access it results in undefined behavior.
+     */
+    const_iterator cend() const noexcept
+    {
+        return const_iterator{*this, true};
+    }
+    //\}
 
     /*!\name Element access
      * \{
@@ -135,7 +164,7 @@ public:
     /*!\brief Return the i-th element as a view.
      * \param i The element to retrieve.
      * \throws std::out_of_range If you access an element behind the last.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      */
     reference at(size_type const i)
     {
@@ -148,7 +177,7 @@ public:
     /*!\brief Return the i-th element as a view.
      * \param i The element to retrieve.
      * \throws std::out_of_range If you access an element behind the last.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      */
     const_reference at(size_type const i) const
     {
@@ -160,30 +189,33 @@ public:
 
     /*!\brief Return the i-th element as a view.
      * \param i The element to retrieve.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      *
-     * Accessing an element behind the last causes undefined behaviour. In debug mode an assertion checks the size of the container.
+     * Accessing an element behind the last causes undefined behaviour. In debug mode an assertion checks the size of
+     * the container.
      */
     reference operator[](size_type const i)
     {
         assert(i < size());
-        return data | ranges::view::drop(delimiters[i]) | ranges::view::take(delimiters[i+1] - delimiters[i]);
+        return data_values | ranges::view::slice(data_delimiters[i], data_delimiters[i+1]);
     }
 
     /*!\brief Return the i-th element as a view.
      * \param i The element to retrieve.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      *
-     * Accessing an element behind the last causes undefined behaviour. In debug mode an assertion checks the size of the container.
+     * Accessing an element behind the last causes undefined behaviour. In debug mode an assertion checks the size of
+     * the container.
      */
     const_reference operator[](size_type const i) const
     {
         assert(i < size());
-        return data | ranges::view::drop(delimiters[i]) | ranges::view::take(delimiters[i+1] - delimiters[i]);
+        return data_values | ranges::view::slice(data_delimiters[i], data_delimiters[i+1])
+                           | ranges::view::const_;
     }
 
     /*!\brief Return the first element as a view. Calling front on an empty container is undefined.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      *
      * Calling front on an empty container is undefined. In debug mode an assertion checks the size of the container.
      */
@@ -194,7 +226,7 @@ public:
     }
 
     /*!\brief Return the first element as a view.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      *
      * Calling front on an empty container is undefined. In debug mode an assertion checks the size of the container.
      */
@@ -205,7 +237,7 @@ public:
     }
 
     /*!\brief Return the last element as a view.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      *
      * Calling back on an empty container is undefined. In debug mode an assertion checks the size of the container.
      */
@@ -216,7 +248,7 @@ public:
     }
 
     /*!\brief Return the last element as a view.
-     * \returns A ranges::any_random_access_view on the underlying concatenated sequences that acts as a proxy for the element.
+     * \returns A ranges::view on the underlying concatenated sequences that acts as a proxy for the element.
      *
      * Calling back on an empty container is undefined. In debug mode an assertion checks the size of the container.
      */
@@ -243,7 +275,7 @@ public:
      */
     size_type size() const noexcept
     {
-        return delimiters.size() - 1;
+        return data_delimiters.size() - 1;
     }
 
     /*!\brief Returns the maximum number of elements the container is able to hold due to system or library
@@ -255,7 +287,7 @@ public:
      */
     size_type max_size() const noexcept
     {
-        return delimiters.max_size() - 1;
+        return data_delimiters.max_size() - 1;
     }
 
     /* How do we deal with these? Not clear if inner_type has them
@@ -277,9 +309,9 @@ public:
      */
     void clear() noexcept
     {
-        data.clear();
-        delimiters.clear();
-        delimiters.push_back(0);
+        data_values.clear();
+        data_delimiters.clear();
+        data_delimiters.push_back(0);
     }
 
     /*!\brief Inserts value before position in the container.
@@ -296,13 +328,13 @@ public:
     iterator insert(const_iterator pos, value_type const & value)
     {
         auto pos_as_num = std::distance(pos, cbegin());
-        data.insert(data.cbegin() + delimiters[pos_as_num], begin(value), end(value));
-        delimiters.insert(delimiters.cbegin() + pos_as_num,
-                          *(delimiters.cbegin() + pos_as_num));
+        data_values.insert(data_values.cbegin() + data_delimiters[pos_as_num], begin(value), end(value));
+        data_delimiters.insert(data_delimiters.cbegin() + pos_as_num,
+                          *(data_delimiters.cbegin() + pos_as_num));
         // TODO parallel execution policy or vectorization?
-        std::for_each(delimiters.cbegin() + pos_as_num + 1,
-                      delimiters.cend(),
-                      [&value] (auto & d) { d += value });
+        std::for_each(data_delimiters.cbegin() + pos_as_num + 1,
+                      data_delimiters.cend(),
+                      [&value] (auto & d) { d += value; });
         return begin() + pos_as_num;
     }
     // no specialization for temporaries, since we have to copy anyway
@@ -323,20 +355,20 @@ public:
     {
         // TODO SEQAN_UNLIKELY
         if (count == 0)
-            return;
+            return pos;
         auto pos_as_num = std::distance(pos, cbegin());
-        auto repeated = value | ranges::view::repeat_n(count);
-        data.insert(data.cbegin() + delimiters[pos_as_num], begin(repeated), end(repeated));
-        delimiters.insert(delimiters.cbegin() + pos_as_num,
+        auto repeated = ranges::view::repeat_n(value, count);
+        data_values.insert(data_values.cbegin() + data_delimiters[pos_as_num], begin(repeated), end(repeated));
+        data_delimiters.insert(data_delimiters.cbegin() + pos_as_num,
                           count,
-                          *(delimiters.cbegin() + pos_as_num));
+                          *(data_delimiters.cbegin() + pos_as_num));
         // TODO parallel execution policy or vectorization?
-        std::for_each(delimiters.cbegin() + pos_as_num + 1,
-                      delimiters.cbegin() + pos_as_num + count,
+        std::for_each(data_delimiters.cbegin() + pos_as_num + 1,
+                      data_delimiters.cbegin() + pos_as_num + count,
                       [&value, factor = 1] (auto & d) mutable { d += value * factor++; });
         // TODO parallel execution policy or vectorization?
-        std::for_each(delimiters.cbegin() + pos_as_num + count,
-                      delimiters.cend(),
+        std::for_each(data_delimiters.cbegin() + pos_as_num + count,
+                      data_delimiters.cend(),
                       [&value] (auto & d) { d += value; });
         return begin() + pos_as_num;
     }
@@ -362,7 +394,7 @@ public:
     {
         // TODO SEQAN_UNLIKELY
         if (first == last)
-            return;
+            return pos;
         //TODO
     }
 
@@ -387,19 +419,17 @@ public:
     //TODO document
     void swap(concatenated_sequences & rhs)
     {
-        std::swap(data, rhs.data);
-        std::swap(delimiters, rhs.delimiters);
+        std::swap(data_values, rhs.data_values);
+        std::swap(data_delimiters, rhs.data_delimiters);
     }
 
     void swap(concatenated_sequences && rhs)
     {
-        std::swap(data, rhs.data);
-        std::swap(delimiters, rhs.delimiters);
+        std::swap(data_values, rhs.data_values);
+        std::swap(data_delimiters, rhs.data_delimiters);
     }
     //!\}
-protected:
-    inner_type data;
-    delimiters_type delimiters;
+
 };
 
 } // namespace seqan3
