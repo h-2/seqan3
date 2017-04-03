@@ -40,10 +40,12 @@
 #include <type_traits>
 #include <vector>
 
-#include <range/v3/view/drop.hpp>
-#include <range/v3/view/take.hpp>
+#include <range/v3/view/const.hpp>
+#include <range/v3/view/join.hpp>
+#include <range/v3/view/repeat_n.hpp>
+#include <range/v3/view/slice.hpp>
 
-#include "concepts.hpp"
+#include <seqan3/container/concepts.hpp>
 
 namespace seqan3
 {
@@ -63,7 +65,7 @@ template <typename inner_type,
 class concatenated_sequences
 {
 protected:
-     //!\privatesection
+    //!\privatesection
     std::decay_t<inner_type> data_values;
     data_delimiters_type data_delimiters;
 public:
@@ -106,10 +108,7 @@ public:
 //             data_values.insert(data_values.end(), val.begin(), val.end());
             data_delimiters.push_back(data_delimiters.back() + val.size());
         }
-        std::cout << data_values << '\n';
-        for (auto && i : data_delimiters)
-            std::cout << i << ", ";
-        std::cout << '\n';
+
         return *this;
     }
     //!\}
