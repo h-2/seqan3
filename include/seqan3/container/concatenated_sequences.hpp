@@ -80,7 +80,9 @@ public:
 
 
     /* rule of six */
-    //!\name Constructors, destructor and assignment operators
+    //!\name Constructors, destructor and assignment
+    //!\{
+    //!\name Rule-of-six
     //!\{
     concatenated_sequences()
     {
@@ -91,26 +93,127 @@ public:
     concatenated_sequences & operator=(concatenated_sequences const &) = default;
     concatenated_sequences & operator=(concatenated_sequences &&) = default;
     ~concatenated_sequences() = default;
+    //!\}
 
+    //!\name Construct/assign from `count` times value
+    //!\brief Construct with `count` times `value`
+    //!\{
+    concatenated_sequences(size_type const count, value_type const & value)
+    {
+        assign(count, value);
+    }
+
+    void assign(size_type const count, value_type const & value)
+    {
+        clear();
+
+        // TODO SEQAN_UNLIKELY
+        if (count == 0)
+            return;
+
+        auto repeated = ranges::view::repeat_n(value, count);
+        data_values = repeated;
+
+        data_delimiters.resize(count + 1);
+        for (size_type i = 0; i <= count; ++i)
+            data_delimiters[i] = i * count;
+    }
+    //!\}
+
+    //!\name Construct/assign from pair of iterators
+    //!\param begin_it begin of range to construct from; must meet input_iterator_concept
+    //!\param end_it end of range to construct from; must meet input_iterator_concept
+    //!\{
+    template <typename begin_iterator_type,
+              typename end_iterator_type>
+        requires //input_iterator_concept<begin_iterator_type> &&
+                 std::is_same_v<std::decay_t<typename begin_iterator_type::value_type>, value_type> &&
+                 //input_iterator_concept<end_iterator_type> &&
+                 std::is_same_v<std::decay_t<typename end_iterator_type::value_type>, value_type>
+    concatenated_sequences(begin_iterator_type begin_it,
+                           end_iterator_type end_it)
+    {
+        assign(begin_it, end_it);
+    }
+
+    template <typename begin_iterator_type,
+              typename end_iterator_type>
+        requires //input_iterator_concept<begin_iterator_type> &&
+                 std::is_same_v<std::decay_t<typename begin_iterator_type::value_type>, value_type> &&
+                 //input_iterator_concept<end_iterator_type> &&
+                 std::is_same_v<std::decay_t<typename end_iterator_type::value_type>, value_type>
+    void assign(begin_iterator_type begin_it,
+                end_iterator_type end_it)
+    {
+        clear();
+
+        while (begin_it != end_it)
+        {
+            data_values.push_back(*begin_it);
+            data_delimiters.push_back(size(*begin_it));
+            ++begin_it;
+        }
+    }
+    //!\}
+
+    //!\name Construct/assign from `std::initializer_list`
+    //!\brief Construct from `std::initializer_list`
+    //!\param ilist an `std::initializer_list` of value_type
+    //!\{
+    concatenated_sequences(std::initializer_list<value_type> ilist)
+    {
+        assign(begin(ilist), end(ilist));
+    }
+
+    void assign(std::initializer_list<value_type> ilist)
+    {
+        assign(begin(ilist), end(ilist));
+    }
+
+    concatenated_sequences & operator=(std::initializer_list<value_type> ilist)
+    {
+        assign(begin(ilist), end(ilist));
+    }
+    //!\}
+
+    //!\name Construct/assign from range
+    //!\brief Construct from a different range
+    //!\param other_sequences Must satisfy input_range_concept<> and have same value_type
+    //!\{
+    template <typename type>
+        requires input_range_concept<std::decay_t<type>> &&
+                 std::is_same_v<std::decay_t<typename std::decay_t<type>::value_type>, value_type>
+    concatenated_sequences(type && other_range)
+    {
+        assign(std::forward<type>(other_range));
+    }
 
     template <typename type>
         requires input_range_concept<std::decay_t<type>> &&
-                 std::is_same_v<std::decay_t<typename type::value_type>, value_type>
-    concatenated_sequences & operator=(type const & in)
+                 std::is_same_v<std::decay_t<typename std::decay_t<type>::value_type>, value_type>
+    void assign(type && other_range)
     {
         clear();
 
         // benchmark between using join and insert
-        data_values = in | ranges::view::join;
+        data_values = other_range | ranges::view::join;
 
-        for (auto const & val : in)
+        for (auto && val : other_range)
         {
 //             data_values.insert(data_values.end(), val.begin(), val.end());
             data_delimiters.push_back(data_delimiters.back() + val.size());
         }
+    }
 
+    template <typename type>
+        requires input_range_concept<std::decay_t<type>> &&
+                 std::is_same_v<std::decay_t<typename std::decay_t<type>::value_type>, value_type>
+    concatenated_sequences & operator=(type && other_range)
+    {
+        assign(std::forward<type>(other_range));
         return *this;
     }
+    //!\}
     //!\}
 
     /*!\name Iterators
@@ -255,6 +358,26 @@ public:
     {
         assert(size() > 0);
         return (*this)[size()-1];
+    }
+
+    /*!\brief Provides access to underlying data structure.
+     * \returns An std::pair of the concatenated sequences and the delimiter string.
+     *
+     * This exact representation of the data is implementation defined. Do not rely on it for API stability.
+     */
+    std::pair<decltype(data_values) &, decltype(data_delimiters) &> data()
+    {
+        return std::tie(data_values, data_delimiters);
+    }
+
+    /*!\brief Provides access to underlying data structure.
+     * \returns An std::pair of the concatenated sequences and the delimiter string.
+     *
+     * This exact representation of the data is implementation defined. Do not rely on it for API stability.
+     */
+    std::pair<decltype(data_values) const &, decltype(data_delimiters) const &> data() const
+    {
+        return std::tie(data_values, data_delimiters);
     }
     //!\}
 
@@ -415,6 +538,8 @@ public:
 
     // TODO emplace, erase, push_back, emplace_back, pop_back, resize
 
+
+
     //TODO document
     void swap(concatenated_sequences & rhs)
     {
@@ -428,9 +553,46 @@ public:
         std::swap(data_delimiters, rhs.data_delimiters);
     }
     //!\}
+    //! @name Comparison operators
+    //!@{
+    constexpr bool operator==(concatenated_sequences const & rhs) const
+    {
+        return data() == rhs.data();
+    }
 
+    constexpr bool operator!=(concatenated_sequences const & rhs) const
+    {
+        return data() != rhs.data();
+    }
+
+    constexpr bool operator<(concatenated_sequences const & rhs) const
+    {
+        return data() < rhs.data();
+    }
+
+    constexpr bool operator>(concatenated_sequences const & rhs) const
+    {
+        return data() > rhs.data();
+    }
+
+    constexpr bool operator<=(concatenated_sequences const & rhs) const
+    {
+        return data() <= rhs.data();
+    }
+
+    constexpr bool operator>=(concatenated_sequences const & rhs) const
+    {
+        return data() >= rhs.data();
+    }
+    //!@}
 };
 
 } // namespace seqan3
 
+#ifndef NDEBUG
+// static_assert(seqan3::container_concept<seqan3::concatenated_sequences<std::string>>);
+// static_assert(seqan3::sequence_concept<seqan3::concatenated_sequences<std::string>>);
+// static_assert(seqan3::random_access_sequence_concept<seqan3::concatenated_sequences<std::string>>);
+// static_assert(seqan3::forward_ranges_concept<seqan3::concatenated_sequences<std::string>>);
+#endif
 
