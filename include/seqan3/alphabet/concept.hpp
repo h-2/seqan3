@@ -58,7 +58,7 @@ namespace seqan3
  * \extends seqan3::regular_concept
  * \extends seqan3::standard_layout_concept
  * \extends seqan3::trivial_concept
- * \extends seqan3::totally_ordered_concept
+ * \extends seqan3::strict_totally_ordered_concept
  *
  * This concept represents "one half" of the seqan3::alphabet_concept, it requires no
  * `char` representation and corresponding interfaces. It is mostly used internally and
@@ -69,7 +69,7 @@ namespace seqan3
  *
  *   * seqan3::regular_concept ("copyable and default-constructible")
  *   * seqan3::standard_layout_concept and seqan3::trivial_concept ("plain-old-datatype")
- *   * seqan3::totally_ordered_concept ("has all comparison operators")
+ *   * seqan3::strict_totally_ordered_concept ("has all comparison operators")
  *
  * For the purpose of concept checking the types `t &` and `t &&` are also considered to satisfy
  * seqan3::semi_alphabet_concept if the type `t` satisfies it.
