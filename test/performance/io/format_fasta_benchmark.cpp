@@ -55,7 +55,6 @@
 #include <seqan3/range/view/convert.hpp>
 
 using namespace seqan3;
-using namespace seqan3::literal;
 
 static void write3(benchmark::State& state)
 {
@@ -103,6 +102,8 @@ static void read3(benchmark::State& state)
     for (auto _ : state)
     {
         format.read(istream, options, seq, id, std::ignore);
+	id.clear();
+	seq.clear();
     }
 }
 BENCHMARK(read3);
@@ -111,13 +112,13 @@ static void read3_from_file(benchmark::State& state)
 {
     // Create fasta file
     std::string filename{"Test_Format_Fasta_Benchmark.fasta"};
-    sequence_file_output fout{filename};
+   /* sequence_file_output fout{filename};
     for (size_t idx = 0; idx < 10000000; idx++)
     {
         std::string id{ "seq" };
         dna5_vector seq{ "ACTAGACTAGCTACGATCAGCTACGATCAGCTACGA"_dna5 };
         fout.push_back(std::tie(seq, id));   // as a tuple
-    }
+    }*/
 
     sequence_file_input fin{filename};
     auto file_it = fin.begin();
@@ -126,7 +127,7 @@ static void read3_from_file(benchmark::State& state)
 
     for (auto _ : state)
     {
-        auto record = *file_it;
+        [[maybe_unused]] volatile auto record = *file_it;
         ++file_it;
     }
 }
@@ -137,55 +138,46 @@ BENCHMARK(read3_from_file);
 #if __has_include(<seqan/seq_io.h>)
 
 #include <fstream>
-
-std::fstream* createFastAFile(seqan::CharString &tempFilename)
+/*
+std::fstream createFastAFile(seqan::CharString &tempFilename)
 {
     using namespace seqan;
 
     tempFilename = SEQAN_TEMP_FILENAME();
-    char filenameBuffer[1000];
-    strncpy(filenameBuffer, toCString(tempFilename), 999);
-
-    std::fstream *file = new std::fstream(filenameBuffer, std::ios_base::in | std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
+    std::fstream myfile;
+    myfile.open(toCString(tempFilename));
     SEQAN_ASSERT(file->is_open());
-
-    std::string dummy_file{};
     for (size_t idx = 0; idx < 10000000; idx++)
-        dummy_file += ">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n";
+        myfile << ">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n";
 
-    char const * STR = dummy_file.c_str();
+    return myfile;
+}*/
 
-    file->write(STR, strlen(STR));
-    file->seekg(0);
-    file->seekp(0);
-    return file;
-}
-
-//TODO: How to read in seqan2 from stringstream?
-/*    static void read2(benchmark::State& state)
+static void read2(benchmark::State& state)
     {
         seqan::CharString meta;
         seqan::Dna5String seq;
-        std::istringstream stream{">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n"};
+        std::string dummy_file{};
+        for (size_t idx = 0; idx < 10000000; idx++)
+            dummy_file += ">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n";
+        std::istringstream istream{dummy_file};
 
-        auto stream_view = view::subrange<decltype(std::istreambuf_iterator<char>{stream}),
-                                          decltype(std::istreambuf_iterator<char>{})>
-                            {std::istreambuf_iterator<char>{stream},
-                             std::istreambuf_iterator<char>{}};
+    	std::istreambuf_iterator<char> iter(istream);
+
 
         for (auto _ : state)
         {
-            seqan::readRecord(meta,seq, begin(stream_view), seqan::Fasta());
+            seqan::readRecord(meta,seq, iter, seqan::Fasta());
         }
 
     }
     BENCHMARK(read2);
-*/
+
     static void read2_from_file(benchmark::State& state)
    {
        seqan::CharString filename;
-       std::fstream *file = createFastAFile(filename);
-       seqan::SeqFileIn reader(*file);
+       //std::fstream *file = createFastAFile("Test_Format_Fasta_Benchmark.fasta");
+       seqan::SeqFileIn reader("Test_Format_Fasta_Benchmark.fasta");
        seqan::CharString meta;
        seqan::Dna5String seq;
        for (auto _ : state)
@@ -193,7 +185,7 @@ std::fstream* createFastAFile(seqan::CharString &tempFilename)
            seqan::readRecord(meta, seq, reader, seqan::Fasta());
        }
 
-       file->close();
+       //file.close();
    }
 
     BENCHMARK(read2_from_file);
