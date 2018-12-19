@@ -102,8 +102,8 @@ static void read3(benchmark::State& state)
     for (auto _ : state)
     {
         format.read(istream, options, seq, id, std::ignore);
-	id.clear();
-	seq.clear();
+	    id.clear();
+	    seq.clear();
     }
 }
 BENCHMARK(read3);
@@ -140,39 +140,41 @@ BENCHMARK(read3_from_file);
 #include <fstream>
 
 static void read2(benchmark::State& state)
+{
+    seqan::CharString meta;
+    seqan::Dna5String seq;
+    std::string dummy_file{};
+    for (size_t idx = 0; idx < 10000000; idx++)
+        dummy_file += ">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n";
+    std::istringstream istream{dummy_file};
+
+    seqan::VirtualStream<char, seqan::Input> comp;
+    open(comp, istream);
+    auto it = seqan::directionIterator(comp, seqan::Input());
+
+    for (auto _ : state)
     {
-        seqan::CharString meta;
-        seqan::Dna5String seq;
-        std::string dummy_file{};
-        for (size_t idx = 0; idx < 10000000; idx++)
-            dummy_file += ">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n";
-        std::istringstream istream{dummy_file};
-
-        seqan::VirtualStream<char, seqan::Input> comp;
-        open(comp, istream);
-        auto it = seqan::directionIterator(comp, seqan::Input());
-
-        for (auto _ : state)
-        {
-            readRecord(meta, seq,  it, seqan::Fasta{});
-            //[[maybe_unused]] volatile auto record = *it;
-            //++it;
-        }
+        readRecord(meta, seq,  it, seqan::Fasta{});
+        clear(meta);
+        clear(seq);
     }
-    BENCHMARK(read2);
+}
+BENCHMARK(read2);
 
-    static void read2_from_file(benchmark::State& state)
-   {
-       seqan::SeqFileIn reader("Test_Format_Fasta_Benchmark.fasta");
-       seqan::CharString meta;
-       seqan::Dna5String seq;
-       for (auto _ : state)
-       {
-           seqan::readRecord(meta, seq, reader, seqan::Fasta());
-       }
-   }
+static void read2_from_file(benchmark::State& state)
+{
+    seqan::SeqFileIn reader("Test_Format_Fasta_Benchmark.fasta");
+    seqan::CharString meta;
+    seqan::Dna5String seq;
+    for (auto _ : state)
+    {
+        seqan::readRecord(meta, seq, reader, seqan::Fasta());
+        clear(meta);
+        clear(seq);
+    }
+}
 
-    BENCHMARK(read2_from_file);
+BENCHMARK(read2_from_file);
 #endif
 
 BENCHMARK_MAIN();
