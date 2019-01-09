@@ -97,7 +97,7 @@ public:
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    constexpr structured_rna() : base_type{} {}
+    constexpr structured_rna() noexcept : base_type{} {}
     constexpr structured_rna(structured_rna const &) = default;
     constexpr structured_rna(structured_rna &&) = default;
     constexpr structured_rna & operator =(structured_rna const &) = default;
@@ -128,7 +128,7 @@ public:
     //!\name Write functions
     //!\{
     //!\brief Assign from a nucleotide character. This modifies the internal sequence letter.
-    constexpr structured_rna & assign_char(char_type const c)
+    constexpr structured_rna & assign_char(char_type const c) noexcept
     {
         seqan3::assign_char(get<0>(*this), c);
         return *this;

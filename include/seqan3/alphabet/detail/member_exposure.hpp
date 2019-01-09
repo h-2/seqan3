@@ -94,8 +94,8 @@ struct alphabet_size<alphabet_type_with_members>
  * \returns The letter's value in the alphabet's rank type (usually a `uint*_t`).
  */
 template <typename alphabet_type>
-constexpr underlying_rank_t<alphabet_type> to_rank(alphabet_type const alph)
-    requires requires (alphabet_type alph) { { alph.to_rank() } -> underlying_rank_t<alphabet_type>; }
+constexpr underlying_rank_t<alphabet_type> to_rank(alphabet_type const alph) noexcept
+    requires requires (alphabet_type alph) { { alph.to_rank() } -> underlying_rank_t<alphabet_type>;  }
 {
     return alph.to_rank();
 }
@@ -107,7 +107,7 @@ constexpr underlying_rank_t<alphabet_type> to_rank(alphabet_type const alph)
  * \returns A reference to the alphabet letter you passed in.
  */
 template <typename alphabet_type>
-constexpr alphabet_type & assign_rank(alphabet_type & alph, underlying_rank_t<alphabet_type> const rank)
+constexpr alphabet_type & assign_rank(alphabet_type & alph, underlying_rank_t<alphabet_type> const rank) noexcept
     requires requires (alphabet_type alph) { { alph.assign_rank(uint8_t{0}) } -> alphabet_type &; }
 {
     return alph.assign_rank(rank);
@@ -125,7 +125,7 @@ constexpr alphabet_type & assign_rank(alphabet_type & alph, underlying_rank_t<al
  * ~~~
  */
 template <typename alphabet_type>
-constexpr alphabet_type && assign_rank(alphabet_type && alph, underlying_rank_t<alphabet_type> const rank)
+constexpr alphabet_type && assign_rank(alphabet_type && alph, underlying_rank_t<alphabet_type> const rank) noexcept
     requires requires (alphabet_type alph) { { alph.assign_rank(uint8_t{0}) } -> alphabet_type &; }
 {
     return std::move(alph.assign_rank(rank));
@@ -162,7 +162,7 @@ struct underlying_char<alphabet_type_with_members>
  * \returns The letter's value in the alphabet's rank type (usually `char`).
  */
 template <typename alphabet_type>
-constexpr underlying_char_t<alphabet_type> to_char(alphabet_type const alph)
+constexpr underlying_char_t<alphabet_type> to_char(alphabet_type const alph) noexcept
     requires requires (alphabet_type alph) { { alph.to_char() } -> underlying_char_t<alphabet_type>; }
 {
     return alph.to_char();
@@ -175,7 +175,7 @@ constexpr underlying_char_t<alphabet_type> to_char(alphabet_type const alph)
  * \returns A reference to the alphabet letter you passed in.
  */
 template <typename alphabet_type>
-constexpr alphabet_type & assign_char(alphabet_type & alph, underlying_char_t<alphabet_type> const chr)
+constexpr alphabet_type & assign_char(alphabet_type & alph, underlying_char_t<alphabet_type> const chr) noexcept
     requires requires (alphabet_type alph) { { alph.assign_char(char{0}) } -> alphabet_type &; }
 {
     return alph.assign_char(chr);
@@ -193,7 +193,7 @@ constexpr alphabet_type & assign_char(alphabet_type & alph, underlying_char_t<al
  * ~~~
  */
 template <typename alphabet_type>
-constexpr alphabet_type && assign_char(alphabet_type && alph, underlying_char_t<alphabet_type> const chr)
+constexpr alphabet_type && assign_char(alphabet_type && alph, underlying_char_t<alphabet_type> const chr) noexcept
     requires requires (alphabet_type alph) { { alph.assign_char(char{0}) } -> alphabet_type &; }
 {
     return std::move(alph.assign_char(chr));
