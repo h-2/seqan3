@@ -41,30 +41,24 @@
 
 #include <seqan3/core/platform.hpp>
 
-// ----------------------------------------------------------------------------
-// is_constexpr
-// ----------------------------------------------------------------------------
-
 namespace seqan3::detail
 {
 
-//!\brief NO-OP helper for is_constexpr
-//!\ingroup metafunction
-constexpr void is_constexpr_helper(int) {}
+//!\brief Creates a constexpr context for the expression passed as template argument and returns the result as value.
+template <bool b>
+constexpr bool is_constexpr_helper() noexcept
+{
+    return b;
+}
 
 } // namespace seqan3::detail
 
-namespace seqan3
-{
+// ----------------------------------------------------------------------------
+// is_constexpr
+// ----------------------------------------------------------------------------
 
 /*!\brief Returns true if the expression passed to this macro can be evaluated at compile time, false otherwise.
  * \ingroup metafunction
  * \returns true or false.
  */
-#if defined(__clang__) // bug: https://bugs.llvm.org//show_bug.cgi?id=15481
-#define SEQAN3_IS_CONSTEXPR(...) __builtin_constant_p( (__VA_ARGS__,0) )
-#else
-#define SEQAN3_IS_CONSTEXPR(...) noexcept(seqan3::detail::is_constexpr_helper( (__VA_ARGS__, 0) ))
-#endif
-
-} // namespace seqan3
+#define SEQAN3_IS_CONSTEXPR(...) seqan3::detail::is_constexpr_helper<(bool)__builtin_constant_p( (__VA_ARGS__,0) )>()
