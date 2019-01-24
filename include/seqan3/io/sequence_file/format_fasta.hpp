@@ -214,7 +214,7 @@ protected:
                  sequence_file_input_options<seq_legal_alph_type, seq_qual_combined> const & options,
                  id_type                                                                & id)
     {
-        auto const is_id = is_char<'>'> || is_char<';'>;
+        static constexpr auto is_id = is_char<'>'> || is_char<';'>;
 
         if (!is_id(*begin(stream_view)))
             throw parse_error{std::string{"Expected to be on beginning of ID, but "} + is_id.msg.string() +
@@ -235,10 +235,15 @@ protected:
             }
             else
             {
-                std::ranges::copy(stream_view | view::take_line_or_throw                                        // read line
-                                              | ranges::view::drop_while(is_id || is_blank)                     // skip leading >
-                                              | view::char_to<value_type_t<id_type>>,
-                                  std::back_inserter(id));
+//                 std::ranges::copy(stream_view | view::take_line_or_throw                                        // read line
+//                                               | ranges::view::drop_while(is_id || is_blank)                     // skip leading >
+//                                               | view::char_to<value_type_t<id_type>>,
+//                                   std::back_inserter(id));
+
+                auto it = begin(stream_view);
+                for (; __builtin_expect(*it != '\n', 1); ++it)
+                    id.push_back(*it);
+                ++it; //consume \n
             }
         }
         else
@@ -255,26 +260,31 @@ protected:
                   sequence_file_input_options<seq_legal_alph_type, seq_qual_combined> const &,
                   seq_type                                                               & seq)
     {
-        auto constexpr is_id = is_char<'>'> || is_char<';'>;
+        static constexpr auto is_id = is_char<'>'> || is_char<';'>;
 
         if constexpr (!detail::decays_to_ignore_v<seq_type>)
         {
-            auto constexpr is_legal_alph = is_in_alphabet<seq_legal_alph_type>;
-            std::ranges::copy(stream_view | view::take_until(is_id)                      // until next header (or end)
-                                          | ranges::view::remove_if(is_space || is_digit)// ignore whitespace and numbers
-                                          | view::transform([is_legal_alph] (char const c)
-                                            {
-                                                if (!is_legal_alph(c))
-                                                {
-                                                    throw parse_error{std::string{"Encountered an unexpected letter: "} +
-                                                                        is_legal_alph.msg.string() +
-                                                                        " evaluated to false on " +
-                                                                        detail::make_printable(c)};
-                                                }
-                                                return c;
-                                            })                                           // enforce legal alphabet
-                                          | view::char_to<value_type_t<seq_type>>,       // convert to actual target alphabet
-                              std::back_inserter(seq));
+//             static constexpr auto is_legal_alph = is_in_alphabet<seq_legal_alph_type>;
+//             std::ranges::copy(stream_view //| view::take_until(is_id)                      // until next header (or end)
+//                                           | ranges::view::take_while(!is_id)              // 10% faster than ours!?
+//                                           | ranges::view::remove_if(is_space || is_digit)// ignore whitespace and numbers
+//                                           | view::transform([] (char const c)
+//                                             {
+//                                                 if (__builtin_expect(!is_legal_alph(c), 0))
+//                                                 {
+//                                                     throw parse_error{std::string{"Encountered an unexpected letter: "} +
+//                                                                         is_legal_alph.msg.string() +
+//                                                                         " evaluated to false on " +
+//                                                                         detail::make_printable(c)};
+//                                                 }
+//                                                 return c;
+//                                             })                                     // enforce legal alphabet
+//                                           | view::char_to<value_type_t<seq_type>>,      // convert to actual target alphabet
+//                               std::back_inserter(seq));
+
+            auto it = begin(stream_view);
+            for (; __builtin_expect(!is_id(*it), 1); ++it)
+                seq.push_back(assign_char(value_type_t<seq_type>{}, *it));
         }
         else
         {

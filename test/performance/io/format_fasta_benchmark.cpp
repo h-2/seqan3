@@ -94,7 +94,7 @@ static void read3(benchmark::State& state)
     std::string dummy_file{};
     for (size_t idx = 0; idx < 10000000; idx++)
         dummy_file += ">seq\nACTAGACTAGCTACGATCAGCTACGATCAGCTACGA\n";
-    std::stringstream istream{dummy_file};
+    std::istringstream istream{dummy_file};
     sequence_file_format_fasta format;
     sequence_file_input_options<dna5, false> options;
     std::string id;
@@ -107,33 +107,6 @@ static void read3(benchmark::State& state)
     }
 }
 BENCHMARK(read3);
-
-static void read3_from_file(benchmark::State& state)
-{
-    // Create fasta file
-    std::string filename{"Test_Format_Fasta_Benchmark.fasta"};
-    sequence_file_output fout{filename};
-    for (size_t idx = 0; idx < 10000000; idx++)
-    {
-        std::string id{ "seq" };
-        dna5_vector seq{ "ACTAGACTAGCTACGATCAGCTACGATCAGCTACGA"_dna5 };
-        fout.push_back(std::tie(seq, id));   // as a tuple
-    }
-
-    sequence_file_input fin{filename};
-    auto file_it = fin.begin();
-    std::string id;
-    dna5_vector seq;
-
-    for (auto _ : state)
-    {
-        [[maybe_unused]] volatile auto record = *file_it;
-        ++file_it;
-    }
-}
-
-BENCHMARK(read3_from_file);
-
 
 #if __has_include(<seqan/seq_io.h>)
 
@@ -160,21 +133,6 @@ static void read2(benchmark::State& state)
     }
 }
 BENCHMARK(read2);
-
-static void read2_from_file(benchmark::State& state)
-{
-    seqan::SeqFileIn reader("Test_Format_Fasta_Benchmark.fasta");
-    seqan::CharString meta;
-    seqan::Dna5String seq;
-    for (auto _ : state)
-    {
-        seqan::readRecord(meta, seq, reader, seqan::Fasta());
-        clear(meta);
-        clear(seq);
-    }
-}
-
-BENCHMARK(read2_from_file);
 #endif
 
 BENCHMARK_MAIN();

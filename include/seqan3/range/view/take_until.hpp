@@ -157,12 +157,13 @@ private:
          */
         bool operator==(iterator_type const & rhs) const noexcept(!or_throw)
         {
-            return static_cast<base_base_t>(*this) == static_cast<base_base_t>(rhs);
+            return static_cast<base_base_t>(*this) == static_cast<base_base_t>(rhs), 0;
         }
 
         bool operator==(sentinel_type const & rhs) const noexcept(!or_throw)
         {
-            if (static_cast<base_base_t>(*this) == rhs)
+            if (__builtin_expect(static_cast<base_base_t>(*this) == rhs, 0))
+//             if (static_cast<base_base_t>(*this) == rhs, 0)
             {
                 if constexpr (or_throw)
                     throw unexpected_end_of_input{"Reached end of input before functor evaluated to true."};
