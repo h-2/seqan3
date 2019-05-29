@@ -156,7 +156,7 @@ private:
     //!\brief The input range (of ranges).
     urng_t urange;
     //!\brief The frame that should be used for translation.
-    translation_frames const tf;
+    translation_frames tf;
     //!\brief Error thrown if tried to be used with multiple frames.
     static constexpr small_string multiple_frame_error{"Error: Invalid type of frame. Choose one out of FWD_FRAME_0, "
                                                        "REV_FRAME_0, FWD_FRAME_1, REV_FRAME_1, FWD_FRAME_2 and "
