@@ -109,22 +109,25 @@ struct translate_fn
 
     //!\brief Directly return an instance of the view, initialised with the given parameters.
     template <std::ranges::Range urng_t>
-    constexpr auto operator()(urng_t && urange, translation_frames const tf = default_frames) const
-    {
-        static_assert(std::ranges::ViewableRange<urng_t>,
-            "The range parameter to view::translate[_single] cannot be a temporary of a non-view range.");
-        static_assert(std::ranges::SizedRange<urng_t>,
-            "The range parameter to view::translate[_single] must model std::ranges::SizedRange.");
-        static_assert(std::ranges::RandomAccessRange<urng_t>,
-            "The range parameter to view::translate[_single] must model std::ranges::RandomAccessRange.");
-        static_assert(NucleotideAlphabet<reference_t<urng_t>>,
-            "The range parameter to view::translate[_single] must be over elements of seqan3::NucleotideAlphabet.");
-
-        if constexpr (single)
-            return detail::view_translate_single{std::forward<urng_t>(urange), tf};
-        else
-            return detail::view_translate{std::forward<urng_t>(urange), tf};
-    }
+    constexpr auto operator()(urng_t && urange, translation_frames const tf = default_frames) const;
+//     {
+//         static_assert(std::ranges::ViewableRange<urng_t>,
+//             "The range parameter to view::translate[_single] cannot be a temporary of a non-view range.");
+//         static_assert(std::ranges::SizedRange<urng_t>,
+//             "The range parameter to view::translate[_single] must model std::ranges::SizedRange.");
+//         static_assert(std::ranges::RandomAccessRange<urng_t>,
+//             "The range parameter to view::translate[_single] must model std::ranges::RandomAccessRange.");
+//         static_assert(NucleotideAlphabet<reference_t<urng_t>>,
+//             "The range parameter to view::translate[_single] must be over elements of seqan3::NucleotideAlphabet.");
+//
+//         if constexpr (single)
+//         {
+//             static_assert(std::ranges::View<decltype(detail::view_translate_single{std::forward<urng_t>(urange), tf})>);
+//             return detail::view_translate_single{std::forward<urng_t>(urange), tf};
+//         }
+//         else
+//             return detail::view_translate{std::forward<urng_t>(urange), tf};
+//     }
 
     //!\brief This adaptor is usuable without setting the frames parameter in which case the default is chosen.
     template <std::ranges::Range urng_t>
@@ -158,7 +161,7 @@ private:
     //!\brief The frame that should be used for translation.
     translation_frames tf;
     //!\brief Error thrown if tried to be used with multiple frames.
-    static constexpr small_string multiple_frame_error{"Error: Invalid type of frame. Choose one out of FWD_FRAME_0, "
+    static inline small_string multiple_frame_error{"Error: Invalid type of frame. Choose one out of FWD_FRAME_0, "
                                                        "REV_FRAME_0, FWD_FRAME_1, REV_FRAME_1, FWD_FRAME_2 and "
                                                        "REV_FRAME_2."};
 public:
@@ -470,6 +473,19 @@ view_translate_single(urng_t &&) -> view_translate_single<std::ranges::all_view<
 
 } // namespace seqan3::detail
 
+
+namespace seqan3::detail
+{
+
+//!\brief Type trait that declares any seqan3::gap_decorator_anchor_set to be **NOT a view**.
+template <typename type>
+constexpr int enable_view<view_translate_single<type>> = 1;
+
+template <typename type>
+constexpr int enable_view<view_translate_single<type> const> = 1;
+
+}
+
 // ============================================================================
 //  translate_single (adaptor object)
 // ============================================================================
@@ -557,7 +573,7 @@ private:
     //!\brief The data members of view_translate_single.
     urng_t urange;
     //!\brief The frames that should be used for translation.
-    translation_frames const tf;
+    translation_frames tf;
     //!\brief The selected frames corresponding to the frames required.
     std::vector<translation_frames> selected_frames{};
 
@@ -857,3 +873,31 @@ inline constexpr auto translate = deep{detail::translate_fn<false>{}};
 //!\}
 
 } // namespace seqan3::view
+
+namespace seqan3::detail
+{
+template <bool single>
+template <std::ranges::Range urng_t>
+constexpr auto translate_fn<single>::operator()(urng_t && urange, translation_frames const tf) const
+{
+    static_assert(std::ranges::ViewableRange<urng_t>,
+        "The range parameter to view::translate[_single] cannot be a temporary of a non-view range.");
+    static_assert(std::ranges::SizedRange<urng_t>,
+        "The range parameter to view::translate[_single] must model std::ranges::SizedRange.");
+    static_assert(std::ranges::RandomAccessRange<urng_t>,
+        "The range parameter to view::translate[_single] must model std::ranges::RandomAccessRange.");
+    static_assert(NucleotideAlphabet<reference_t<urng_t>>,
+        "The range parameter to view::translate[_single] must be over elements of seqan3::NucleotideAlphabet.");
+
+    if constexpr (single)
+    {
+        static_assert(std::ranges::View<decltype(detail::view_translate_single{std::forward<urng_t>(urange), tf})>);
+//         static_assert(std::ranges::ViewableRange<decltype(detail::view_translate_single{std::forward<urng_t>(urange), tf})>);
+// //         static_assert(std::ranges::ViewableRange<detail::view_translate_single<std::ranges::all_view<urng_t>>>);
+        return detail::view_translate_single{std::forward<urng_t>(urange), tf};
+    }
+    else
+        return detail::view_translate{std::forward<urng_t>(urange), tf};
+}
+
+} // namespace seqan3::detail

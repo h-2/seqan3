@@ -34,6 +34,9 @@ using nucleotide_types  = ::testing::Types<dna4, dna5, dna15, rna4, rna5, rna15>
 
 TYPED_TEST_CASE(nucleotide, nucleotide_types);
 
+template <::ranges::ViewableRange t>
+void foobar(t &&) {}
+
 TYPED_TEST(nucleotide, view_translate_single)
 {
     std::string const in{"ACGTACGTACGTA"};
@@ -65,6 +68,15 @@ TYPED_TEST(nucleotide, view_translate_single)
     auto v5 = vec | view::complement | view::translate_single(translation_frames::FWD_FRAME_0);
     // == [C,M,H,A]
     EXPECT_TRUE((std::ranges::equal(v5, cmp2)));
+
+    foobar(vec /*| view::complement */| view::translate_single(translation_frames::FWD_FRAME_0));
+    // combinability
+//     auto v6 = ranges::reverse_view<decltype(v5)>{v5};
+//     auto v6 = vec | view::complement | view::translate_single(translation_frames::FWD_FRAME_0) | view::take(3);
+//     auto v6 = std::view::all(v5);
+//     // == [C,M,H,A]
+//     aa27_vector cmp3{"AHMC"_aa27};
+//     EXPECT_TRUE((std::ranges::equal(v6, cmp3)));
 }
 
 // TYPED_TEST(nucleotide, view_translate)
@@ -186,6 +198,7 @@ TYPED_TEST(nucleotide, view_translate_single_container_conversion)
 //         EXPECT_TRUE(concatenated_sequences<std::vector<aa27> >(v1) == cmp1);
 // }
 
+
 TYPED_TEST(nucleotide, view_translate_single_concepts)
 {
     std::string const in{"ACGTACGTACGTA"};
@@ -201,6 +214,14 @@ TYPED_TEST(nucleotide, view_translate_single_concepts)
     EXPECT_TRUE(std::ranges::RandomAccessRange<decltype(v1)>);
     EXPECT_TRUE(std::ranges::SizedRange<decltype(v1)>);
     EXPECT_TRUE(std::ranges::View<decltype(v1)>);
+    EXPECT_TRUE(std::ranges::View<::ranges::detail::decay_t<decltype(v1)>>);
+    EXPECT_TRUE(std::ranges::Range<decltype(v1)>);
+    EXPECT_TRUE(std::ranges::ViewableRange<decltype(v1)>);
+
+    EXPECT_TRUE(::ranges::Range<decltype(v1)>);
+    EXPECT_TRUE(::ranges::View<::ranges::detail::decay_t<decltype(v1)>>);
+    EXPECT_TRUE(::ranges::ViewableRange<decltype(v1)>);
+
     EXPECT_TRUE((std::is_same_v<aa27, value_type_t<decltype(v1)>>));
     EXPECT_TRUE((std::is_same_v<aa27, reference_t<decltype(v1)>>));
 }
