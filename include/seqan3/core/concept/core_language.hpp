@@ -36,10 +36,10 @@ SEQAN3_CONCEPT weakly_equality_comparable_with =
     requires(std::remove_reference_t<T> const & t,
              std::remove_reference_t<U> const & u)
     {
-        t == u ? 1 : 0;
-        t != u ? 1 : 0;
-        u == t ? 1 : 0;
-        u != t ? 1 : 0;
+        std::boolean<decltype(t == u)>;
+        std::boolean<decltype(t != u)>;
+        std::boolean<decltype(u == t)>;
+        std::boolean<decltype(u != t)>;
     };
 //!\endcond
 
@@ -77,6 +77,15 @@ SEQAN3_CONCEPT convertible_to_by_member = requires (source_t s)
 {
     { s.operator target_t() } -> target_t;
 };
+//!\endcond
+//!\}
+
+/*!\interface   seqan3::detail::convertible_to_by_member <>
+ * \brief       Like seqan3::implicitly_convertible_to, but only considers member operators of the source type.
+ */
+//!\cond
+template <typename source_t, typename target_t>
+SEQAN3_CONCEPT weakly_convertible_to = std::is_convertible_v<source_t, target_t>;
 //!\endcond
 //!\}
 

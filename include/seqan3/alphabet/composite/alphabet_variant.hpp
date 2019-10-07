@@ -26,6 +26,7 @@
 #include <seqan3/alphabet/alphabet_base.hpp>
 #include <seqan3/core/concept/core_language.hpp>
 #include <seqan3/core/detail/int_types.hpp>
+#include <seqan3/core/type_list/traits.hpp>
 #include <seqan3/core/type_traits/pack.hpp>
 #include <seqan3/core/type_traits/range.hpp>
 #include <seqan3/core/type_traits/transformation_trait_or.hpp>
@@ -132,6 +133,12 @@ inline bool constexpr one_alternative_is<alphabet_variant<alternatives...>,
                                          target_t> = false;
 
 //!\endcond
+/*
+template <typename ...alternatives,
+          typename target_t>
+inline constexpr bool variant_guard = std::is_same_v<alphabet_variant<alternatives...>, target_t> ||*/
+
+
 
 } // namespace seqan3::detail
 
@@ -258,7 +265,8 @@ public:
      */
     template <typename alternative_t>
     //!\cond
-        requires holds_alternative<alternative_t>()
+        requires !std::derived_from<alternative_t, alphabet_variant> &&
+                 holds_alternative<alternative_t>()
     //!\endcond
     constexpr alphabet_variant(alternative_t const & alternative) noexcept
     {
@@ -275,12 +283,12 @@ public:
      */
     template <typename indirect_alternative_t>
     //!\cond
-        requires !detail::one_alternative_is<alphabet_variant,
-                                             detail::implicitly_convertible_from,
-                                             indirect_alternative_t> &&
-                 detail::one_alternative_is<alphabet_variant,
-                                            detail::constructible_from,
-                                            indirect_alternative_t>
+        requires !std::derived_from<indirect_alternative_t, alphabet_variant> &&
+                 (!holds_alternative<indirect_alternative_t>()) &&
+                 (!list_traits::contains<alphabet_variant, detail::transformation_trait_or_t<detail::recursive_tuple_components<indirect_alternative_t>, type_list<>>>) &&
+                 (!(detail::convertible_to_by_member<indirect_alternative_t, alternative_types> || ...)) &&
+//                  (!(detail::weakly_convertible_to<indirect_alternative_t, alternative_types> || ...)) &&
+                 (std::constructible_from<alternative_types, indirect_alternative_t> || ...)
     //!\endcond
     constexpr alphabet_variant(indirect_alternative_t const & rhs) noexcept
     {
@@ -290,9 +298,12 @@ public:
 
     //!\cond
     template <typename indirect_alternative_t>
-        requires detail::one_alternative_is<alphabet_variant,
-                                            detail::implicitly_convertible_from,
-                                            indirect_alternative_t>
+        requires (!std::derived_from<indirect_alternative_t, alphabet_variant>) &&
+                 (!holds_alternative<indirect_alternative_t>()) &&
+                 (!list_traits::contains<alphabet_variant, detail::transformation_trait_or_t<detail::recursive_tuple_components<indirect_alternative_t>, type_list<>>>) &&
+                 (detail::convertible_to_by_member<indirect_alternative_t, alternative_types> || ...)
+//                  (detail::weakly_convertible_to<indirect_alternative_t, alternative_types> || ...)
+
     constexpr alphabet_variant(indirect_alternative_t const & rhs) noexcept
     {
         assign_rank(
@@ -310,15 +321,13 @@ public:
      */
     template <typename indirect_alternative_t>
     //!\cond
-        requires !detail::one_alternative_is<alphabet_variant,
-                                             detail::implicitly_convertible_from,
-                                             indirect_alternative_t> &&             // constructor takes care
-                 !detail::one_alternative_is<alphabet_variant,
-                                             detail::constructible_from,
-                                             indirect_alternative_t> &&             // constructor takes care
-                 detail::one_alternative_is<alphabet_variant,
-                                            detail::assignable_from,
-                                            indirect_alternative_t>
+        requires (!std::derived_from<indirect_alternative_t, alphabet_variant>) &&
+                 (!holds_alternative<indirect_alternative_t>()) &&
+                 (!list_traits::contains<alphabet_variant, detail::transformation_trait_or_t<detail::recursive_tuple_components<indirect_alternative_t>, type_list<>>>) &&
+                 (!(detail::convertible_to_by_member<indirect_alternative_t, alternative_types> || ...)) &&
+//                  (!(detail::weakly_convertible_to<indirect_alternative_t, alternative_types> || ...)) &&
+                 (!(std::constructible_from<alternative_types, indirect_alternative_t> || ...)) &&
+                 (std::assignable_from<alternative_types, indirect_alternative_t> || ...)
     //!\endcond
     constexpr alphabet_variant & operator=(indirect_alternative_t const & rhs) noexcept
     {
@@ -414,23 +423,40 @@ public:
      */
     //!\brief Checks for equality.
     template <typename alternative_t>
-    constexpr bool operator==(alternative_t const rhs) const noexcept
-    //!\cond
-        requires holds_alternative<alternative_t>()
-    //!\endcond
+    friend constexpr auto operator==(alphabet_variant const lhs, alternative_t const rhs) noexcept
+        -> std::enable_if_t<holds_alternative<alternative_t>(),
+                            bool>
     {
-        return is_alternative<alternative_t>() && (convert_unsafely_to<alternative_t>() == rhs);
+        return lhs.is_alternative<alternative_t>() && (lhs.convert_unsafely_to<alternative_t>() == rhs);
     }
 
     //!\brief Checks for inequality.
     template <typename alternative_t>
-    constexpr bool operator!=(alternative_t const rhs) const noexcept
-    //!\cond
-        requires holds_alternative<alternative_t>()
-    //!\endcond
+    friend constexpr auto operator!=(alphabet_variant const lhs, alternative_t const rhs) noexcept
+        -> std::enable_if_t<holds_alternative<alternative_t>(),
+                            bool>
     {
-        return !operator==(rhs);
+        return !(lhs == rhs);
     }
+
+    //!\brief Checks for equality.
+    template <typename alternative_t>
+    friend constexpr auto operator==(alternative_t const lhs, alphabet_variant const rhs) noexcept
+        -> std::enable_if_t<holds_alternative<alternative_t>(),
+                            bool>
+    {
+        return rhs == lhs;
+    }
+
+    //!\brief Checks for inequality.
+    template <typename alternative_t>
+    friend constexpr auto operator!=(alternative_t const lhs, alphabet_variant const rhs) noexcept
+        -> std::enable_if_t<holds_alternative<alternative_t>(),
+                            bool>
+    {
+        return rhs != rhs;
+    }
+
     //!\}
 
     /*!\name Comparison operators (against indirect alternatives)
@@ -442,29 +468,43 @@ public:
      */
     //!\brief Checks for equality.
     template <typename indirect_alternative_type>
-    constexpr bool operator==(indirect_alternative_type const rhs) const noexcept
-    //!\cond
-        requires detail::one_alternative_is<alphabet_variant,
-                                            detail::weakly_equality_comparable_with_,
-                                            indirect_alternative_type>
-    //!\endcond
+    friend constexpr auto operator==(alphabet_variant const lhs, indirect_alternative_type const rhs) noexcept
+        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
+                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+                            bool>
     {
         using alternative_t =
             meta::front<meta::find_if<alternatives,
                                       detail::weakly_equality_comparable_with_<indirect_alternative_type>>>;
-        return is_alternative<alternative_t>() && (convert_unsafely_to<alternative_t>() == rhs);
+        return lhs.is_alternative<alternative_t>() && (lhs.convert_unsafely_to<alternative_t>() == rhs);
     }
 
     //!\brief Checks for inequality.
     template <typename indirect_alternative_type>
-    constexpr bool operator!=(indirect_alternative_type const rhs) const noexcept
-    //!\cond
-        requires detail::one_alternative_is<alphabet_variant,
-                                            detail::weakly_equality_comparable_with_,
-                                            indirect_alternative_type>
-    //!\endcond
+    friend constexpr auto operator!=(alphabet_variant const lhs, indirect_alternative_type const rhs) noexcept
+        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
+                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+                            bool>
     {
-        return !operator==(rhs);
+        return !(lhs == rhs);
+    }
+
+    template <typename indirect_alternative_type>
+    friend constexpr auto operator==(indirect_alternative_type const lhs, alphabet_variant const rhs) noexcept
+        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
+                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+                            bool>
+    {
+        return rhs == lhs;
+    }
+
+    template <typename indirect_alternative_type>
+    friend constexpr auto operator!=(indirect_alternative_type const lhs, alphabet_variant const rhs) noexcept
+        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
+                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+                            bool>
+    {
+        return rhs != lhs;
     }
     //!\}
 
@@ -623,33 +663,5 @@ protected:
         return is_valid;
     }
 };
-
-/*!\name Comparison operators
- * \relates alphabet_variant
- * \brief Free function (in-)equality comparison operators that forward to member operators (for types != self).
- *\{
- */
-//!\brief Checks for equality.
-template <typename lhs_t, typename ...alternative_types>
-constexpr bool operator==(lhs_t const lhs, alphabet_variant<alternative_types...> const rhs) noexcept
-//!\cond
-    requires detail::weakly_equality_comparable_by_members_with<alphabet_variant<alternative_types...>, lhs_t> &&
-             !detail::weakly_equality_comparable_by_members_with<lhs_t, alphabet_variant<alternative_types...>>
-//!\endcond
-{
-    return rhs == lhs;
-}
-
-//!\brief Checks for inequality.
-template <typename lhs_t, typename ...alternative_types>
-constexpr bool operator!=(lhs_t const lhs, alphabet_variant<alternative_types...> const rhs) noexcept
-//!\cond
-    requires detail::weakly_equality_comparable_by_members_with<alphabet_variant<alternative_types...>, lhs_t> &&
-             !detail::weakly_equality_comparable_by_members_with<lhs_t, alphabet_variant<alternative_types...>>
-//!\endcond
-{
-    return rhs != lhs;
-}
-//!\}
 
 } // namespace seqan3

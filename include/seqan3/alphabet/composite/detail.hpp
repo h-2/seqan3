@@ -139,6 +139,10 @@ struct weakly_equality_comparable_with_
     using invoke = std::integral_constant<bool, weakly_equality_comparable_with<type, T>>;
 };
 
+template <typename lhs_t, typename rhs_t>
+struct weakly_equality_comparable_with_trait : std::integral_constant<bool, weakly_equality_comparable_with<lhs_t, rhs_t>>
+{};
+
 /*!\brief 'Callable' helper class that is invokable by meta::invoke.
  * Returns an std::true_type if the `type` is comparable via <,<=,>,>= to `T`.
  */
