@@ -509,7 +509,8 @@ public:
     //!\brief Checks whether `*this` is equal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator==(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_equality_comparable_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_equality_comparable_with_<indirect_component_type>>>;
@@ -518,7 +519,8 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator==(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_equality_comparable_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
                             bool>
     {
         return rhs == lhs;
@@ -527,7 +529,8 @@ public:
     //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator!=(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_equality_comparable_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_equality_comparable_with_<indirect_component_type>>>;
@@ -536,7 +539,8 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator!=(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_equality_comparable_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
                             bool>
     {
         return rhs != lhs;
@@ -545,7 +549,9 @@ public:
     //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator<(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_ordered_with_<indirect_component_type>>>;
@@ -554,7 +560,9 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator<(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         return rhs < lhs;
@@ -563,7 +571,9 @@ public:
     //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator<=(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_ordered_with_<indirect_component_type>>>;
@@ -572,7 +582,9 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator<=(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         return rhs <= lhs;
@@ -581,7 +593,9 @@ public:
     //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator>(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_ordered_with_<indirect_component_type>>>;
@@ -590,7 +604,9 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator>(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         return rhs > lhs;
@@ -599,7 +615,9 @@ public:
      //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator>=(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_ordered_with_<indirect_component_type>>>;
@@ -608,7 +626,9 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator>=(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<detail::one_component_is<alphabet_tuple_base, derived_type, detail::weakly_ordered_with_, indirect_component_type>,
+        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
+                            (detail::deferred_weakly_ordered_with_trait<!(std::same_as<derived_type, indirect_component_type> || (std::convertible_to<indirect_component_type, component_types> || ...)
+                                || (std::convertible_to<derived_type, indirect_component_type>)), indirect_component_type, component_types>::value || ...),
                             bool>
     {
         return rhs >= lhs;

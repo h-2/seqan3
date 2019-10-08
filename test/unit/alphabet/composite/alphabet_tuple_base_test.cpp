@@ -22,12 +22,12 @@ struct test_composite : public alphabet_tuple_base<test_composite<type1, type2>,
     using base_t::base_t;
     using base_t::operator=;
 
-    using base_t::operator==;
-    using base_t::operator!=;
-    using base_t::operator<;
-    using base_t::operator>;
-    using base_t::operator<=;
-    using base_t::operator>=;
+//     using base_t::operator==;
+//     using base_t::operator!=;
+//     using base_t::operator<;
+//     using base_t::operator>;
+//     using base_t::operator<=;
+//     using base_t::operator>=;
 };
 
 template <>
