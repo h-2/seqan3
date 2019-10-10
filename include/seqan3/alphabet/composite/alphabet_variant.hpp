@@ -424,10 +424,10 @@ public:
     //!\brief Checks for equality.
     template <typename alphabet_variant_t, typename alternative_t>
     friend constexpr auto operator==(alphabet_variant_t const lhs, alternative_t const rhs) noexcept
-        -> std::enable_if_t<std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>(),
+        -> std::enable_if_t<(std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>()),
                             bool>
     {
-        return lhs.is_alternative<alternative_t>() && (lhs.convert_unsafely_to<alternative_t>() == rhs);
+        return lhs.template is_alternative<alternative_t>() && (lhs.template convert_unsafely_to<alternative_t>() == rhs);
     }
 
     //!\brief Checks for inequality.
@@ -454,7 +454,7 @@ public:
         -> std::enable_if_t<std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>(),
                             bool>
     {
-        return rhs != rhs;
+        return rhs != lhs;
     }
 
     //!\}
