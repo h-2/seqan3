@@ -24,6 +24,7 @@
 #include <seqan3/alphabet/quality/concept.hpp>
 #include <seqan3/core/concept/core_language.hpp>
 #include <seqan3/core/concept/tuple.hpp>
+#include <seqan3/core/detail/debug_stream_type.hpp>
 #include <seqan3/core/detail/int_types.hpp>
 #include <seqan3/core/type_traits/pack.hpp>
 #include <seqan3/core/type_traits/transformation_trait_or.hpp>
@@ -256,6 +257,72 @@ private:
 
         // Does not inherit the base's constructor for alphabet_type so as not to cause ambiguity
         //!\}
+
+        /*!\name Comparison operators (against proxy types)
+         * \brief `*this` is cast to the component type before comparison. (These overloads enable comparison for all types
+         *        that a component type is comparable with).
+         * \{
+         */
+        //!\brief Checks whether `*this` is equal to `rhs`.
+        friend constexpr bool operator==(derived_type const lhs, component_proxy const rhs) noexcept
+        {
+            return get<index>(lhs) == static_cast<alphabet_type>(rhs);
+        }
+
+        friend constexpr bool operator==(component_proxy<alphabet_type, index> const lhs, derived_type const rhs) noexcept
+        {
+            return rhs == lhs;
+        }
+
+        friend constexpr bool operator!=(derived_type const lhs, component_proxy const rhs) noexcept
+        {
+            return get<index>(lhs) != static_cast<alphabet_type>(rhs);
+        }
+
+        friend constexpr bool operator!=(component_proxy<alphabet_type, index> const lhs, derived_type const rhs) noexcept
+        {
+            return rhs != lhs;
+        }
+
+        friend constexpr bool operator<(derived_type const lhs, component_proxy const rhs) noexcept
+        {
+            return get<index>(lhs) < static_cast<alphabet_type>(rhs);
+        }
+
+        friend constexpr bool operator<(component_proxy<alphabet_type, index> const lhs, derived_type const rhs) noexcept
+        {
+            return rhs >= lhs;
+        }
+
+        friend constexpr bool operator<=(derived_type const lhs, component_proxy const rhs) noexcept
+        {
+            return get<index>(lhs) <= static_cast<alphabet_type>(rhs);
+        }
+
+        friend constexpr bool operator<=(component_proxy<alphabet_type, index> const lhs, derived_type const rhs) noexcept
+        {
+            return rhs > lhs;
+        }
+
+        friend constexpr bool operator>(derived_type const lhs, component_proxy const rhs) noexcept
+        {
+            return get<index>(lhs) > static_cast<alphabet_type>(rhs);
+        }
+
+        friend constexpr bool operator>(component_proxy<alphabet_type, index> const lhs, derived_type const rhs) noexcept
+        {
+            return rhs <= lhs;
+        }
+
+        friend constexpr bool operator>=(derived_type const lhs, component_proxy const rhs) noexcept
+        {
+            return get<index>(lhs) >= static_cast<alphabet_type>(rhs);
+        }
+
+        friend constexpr bool operator>=(component_proxy<alphabet_type, index> const lhs, derived_type const rhs) noexcept
+        {
+            return rhs < lhs;
+        }
     };
 
     /*!\name Constructors, destructor and assignment
@@ -422,6 +489,20 @@ public:
         get<component_type>(*this) = tmp;
         return static_cast<derived_type &>(*this);
     }
+
+    template <typename indirect_component_type>
+        requires (!std::derived_from<indirect_component_type, alphabet_tuple_base>) &&
+                 (!is_unique_component<indirect_component_type>) &&
+                 (!(std::assignable_from<component_types, indirect_component_type> || ...)) &&
+                 (!(std::convertible_to<indirect_component_type, component_types> || ...)) &&
+                 (std::constructible_from<component_types, indirect_component_type> || ...)
+    constexpr derived_type & operator=(indirect_component_type const & alph) noexcept
+    {
+        using component_type = meta::front<meta::find_if<component_list, detail::constructible_from<indirect_component_type>>>;
+        component_type tmp(alph); // delegate construction
+        get<component_type>(*this) = tmp;
+        return static_cast<derived_type &>(*this);
+    }
     //!\endcond
     //!\}
 
@@ -501,6 +582,14 @@ public:
     }
     //!\}
 
+    template <typename char_t>
+    friend debug_stream_type<char_t> & operator<<(debug_stream_type<char_t> & s, derived_type const)
+    {
+        s << "TODO";
+        return s;
+    }
+
+#if 0
     /*!\name Comparison operators (against indirect component_list)
      * \brief `*this` is cast to the component type before comparison. (These overloads enable comparison for all types
      *        that a component type is comparable with).
@@ -509,8 +598,10 @@ public:
     //!\brief Checks whether `*this` is equal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator==(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
-                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<derived_type, indirect_component_type> || is_component<indirect_component_type>),
+                             indirect_component_type,
+                             component_types>::value || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_equality_comparable_with_<indirect_component_type>>>;
@@ -519,8 +610,10 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator==(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
-                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<derived_type, indirect_component_type> || is_component<indirect_component_type>),
+                             indirect_component_type,
+                             component_types>::value || ...),
                             bool>
     {
         return rhs == lhs;
@@ -529,8 +622,10 @@ public:
     //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator!=(derived_type const lhs, indirect_component_type const rhs) noexcept
-        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
-                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<derived_type, indirect_component_type> || is_component<indirect_component_type>),
+                             indirect_component_type,
+                             component_types>::value || ...),
                             bool>
     {
         using component_type = meta::front<meta::find_if<component_list, detail::weakly_equality_comparable_with_<indirect_component_type>>>;
@@ -539,13 +634,16 @@ public:
 
     template <typename indirect_component_type>
     friend constexpr auto operator!=(indirect_component_type const lhs, derived_type const rhs) noexcept
-        -> std::enable_if_t<!std::same_as<derived_type, indirect_component_type> &&
-                            (detail::weakly_equality_comparable_with<indirect_component_type, component_types> || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<derived_type, indirect_component_type> || is_component<indirect_component_type>),
+                             indirect_component_type,
+                             component_types>::value || ...),
                             bool>
     {
         return rhs != lhs;
     }
-
+#endif
+/*
     //!\brief Checks whether `lhs` is unequal to `rhs`.
     template <typename indirect_component_type>
     friend constexpr auto operator<(derived_type const lhs, indirect_component_type const rhs) noexcept
@@ -633,7 +731,7 @@ public:
     {
         return rhs >= lhs;
     }
-
+*/
     //!\}
 
 private:

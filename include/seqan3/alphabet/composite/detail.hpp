@@ -166,6 +166,14 @@ template <typename lhs_t, typename rhs_t>
 struct deferred_weakly_ordered_with_trait<true, lhs_t, rhs_t> : std::integral_constant<bool, weakly_ordered_with<lhs_t, rhs_t>>
 {};
 
+template <bool deferrer, typename lhs_t, typename rhs_t>
+struct deferred_weakly_equality_comparable_with_trait : std::false_type
+{};
+
+template <typename lhs_t, typename rhs_t>
+struct deferred_weakly_equality_comparable_with_trait<true, lhs_t, rhs_t> : std::integral_constant<bool, detail::weakly_equality_comparable_with<lhs_t, rhs_t>>
+{};
+
 } // namespace seqan3::detail
 
 // ------------------------------------------------------------------

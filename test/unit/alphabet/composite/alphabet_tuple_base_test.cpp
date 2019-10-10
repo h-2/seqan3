@@ -12,6 +12,7 @@
 #include <seqan3/alphabet/nucleotide/rna5.hpp>
 
 #include "alphabet_tuple_base_test_template.hpp"
+#include "../semi_alphabet_test_template.hpp"
 
 using namespace seqan3;
 
@@ -68,4 +69,7 @@ public:
 
 using test_composite_types = ::testing::Types<test_composite<dna4, dna5>>;
 
-INSTANTIATE_TYPED_TEST_CASE_P(test_composite, alphabet_tuple_base_test, test_composite_types);
+using foo = test_composite<dna4, dna5>;
+
+INSTANTIATE_TYPED_TEST_CASE_P(test_composite, semi_alphabet_test, foo);
+// INSTANTIATE_TYPED_TEST_CASE_P(test_composite, alphabet_tuple_base_test, test_composite_types);

@@ -469,8 +469,10 @@ public:
     //!\brief Checks for equality.
     template <typename indirect_alternative_type>
     friend constexpr auto operator==(alphabet_variant const lhs, indirect_alternative_type const rhs) noexcept
-        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
-                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             indirect_alternative_type,
+                             alternative_types>::value || ...),
                             bool>
     {
         using alternative_t =
@@ -482,8 +484,10 @@ public:
     //!\brief Checks for inequality.
     template <typename indirect_alternative_type>
     friend constexpr auto operator!=(alphabet_variant const lhs, indirect_alternative_type const rhs) noexcept
-        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
-                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             indirect_alternative_type,
+                             alternative_types>::value || ...),
                             bool>
     {
         return !(lhs == rhs);
@@ -491,8 +495,10 @@ public:
 
     template <typename indirect_alternative_type>
     friend constexpr auto operator==(indirect_alternative_type const lhs, alphabet_variant const rhs) noexcept
-        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
-                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             indirect_alternative_type,
+                             alternative_types>::value || ...),
                             bool>
     {
         return rhs == lhs;
@@ -500,8 +506,10 @@ public:
 
     template <typename indirect_alternative_type>
     friend constexpr auto operator!=(indirect_alternative_type const lhs, alphabet_variant const rhs) noexcept
-        -> std::enable_if_t<!holds_alternative<indirect_alternative_type>() &&
-                            (detail::weakly_equality_comparable_with_trait<alternative_types, indirect_alternative_type>::value || ...),
+        -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             indirect_alternative_type,
+                             alternative_types>::value || ...),
                             bool>
     {
         return rhs != lhs;
