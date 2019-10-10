@@ -422,36 +422,36 @@ public:
      * \{
      */
     //!\brief Checks for equality.
-    template <typename alternative_t>
-    friend constexpr auto operator==(alphabet_variant const lhs, alternative_t const rhs) noexcept
-        -> std::enable_if_t<holds_alternative<alternative_t>(),
+    template <typename alphabet_variant_t, typename alternative_t>
+    friend constexpr auto operator==(alphabet_variant_t const lhs, alternative_t const rhs) noexcept
+        -> std::enable_if_t<std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>(),
                             bool>
     {
         return lhs.is_alternative<alternative_t>() && (lhs.convert_unsafely_to<alternative_t>() == rhs);
     }
 
     //!\brief Checks for inequality.
-    template <typename alternative_t>
-    friend constexpr auto operator!=(alphabet_variant const lhs, alternative_t const rhs) noexcept
-        -> std::enable_if_t<holds_alternative<alternative_t>(),
+    template <typename alphabet_variant_t, typename alternative_t>
+    friend constexpr auto operator!=(alphabet_variant_t const lhs, alternative_t const rhs) noexcept
+        -> std::enable_if_t<std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>(),
                             bool>
     {
         return !(lhs == rhs);
     }
 
     //!\brief Checks for equality.
-    template <typename alternative_t>
-    friend constexpr auto operator==(alternative_t const lhs, alphabet_variant const rhs) noexcept
-        -> std::enable_if_t<holds_alternative<alternative_t>(),
+    template <typename alphabet_variant_t, typename alternative_t>
+    friend constexpr auto operator==(alternative_t const lhs, alphabet_variant_t const rhs) noexcept
+        -> std::enable_if_t<std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>(),
                             bool>
     {
         return rhs == lhs;
     }
 
     //!\brief Checks for inequality.
-    template <typename alternative_t>
-    friend constexpr auto operator!=(alternative_t const lhs, alphabet_variant const rhs) noexcept
-        -> std::enable_if_t<holds_alternative<alternative_t>(),
+    template <typename alphabet_variant_t, typename alternative_t>
+    friend constexpr auto operator!=(alternative_t const lhs, alphabet_variant_t const rhs) noexcept
+        -> std::enable_if_t<std::same_as<alphabet_variant_t, alphabet_variant> && holds_alternative<alternative_t>(),
                             bool>
     {
         return rhs != rhs;
@@ -470,7 +470,7 @@ public:
     template <typename indirect_alternative_type>
     friend constexpr auto operator==(alphabet_variant const lhs, indirect_alternative_type const rhs) noexcept
         -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
-                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>()),
                              indirect_alternative_type,
                              alternative_types>::value || ...),
                             bool>
@@ -485,7 +485,7 @@ public:
     template <typename indirect_alternative_type>
     friend constexpr auto operator!=(alphabet_variant const lhs, indirect_alternative_type const rhs) noexcept
         -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
-                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>()),
                              indirect_alternative_type,
                              alternative_types>::value || ...),
                             bool>
@@ -496,7 +496,7 @@ public:
     template <typename indirect_alternative_type>
     friend constexpr auto operator==(indirect_alternative_type const lhs, alphabet_variant const rhs) noexcept
         -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
-                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>()),
                              indirect_alternative_type,
                              alternative_types>::value || ...),
                             bool>
@@ -507,7 +507,7 @@ public:
     template <typename indirect_alternative_type>
     friend constexpr auto operator!=(indirect_alternative_type const lhs, alphabet_variant const rhs) noexcept
         -> std::enable_if_t<(detail::deferred_weakly_equality_comparable_with_trait<
-                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>),
+                             !(std::same_as<alphabet_variant, indirect_alternative_type> || holds_alternative<indirect_alternative_type>()),
                              indirect_alternative_type,
                              alternative_types>::value || ...),
                             bool>
