@@ -133,6 +133,8 @@ private:
             roll_factor = std::pow(sigma, std::ranges::size(shape_) - 1);
 
             hash_full();
+
+            all_set = shape_.all();
         }
         //!\}
 
@@ -388,10 +390,12 @@ private:
         //!\brief Iterator to the rightmost position of the k-mer.
         it_t text_right;
 
+        bool all_set = false;
+
         //!\brief Increments iterator by 1.
         void hash_forward()
         {
-            if (shape_.all())
+            if (all_set)
             {
                 hash_roll_forward();
             }
@@ -423,7 +427,7 @@ private:
             requires std::bidirectional_iterator<it_t>
         //!\endcond
         {
-            if (shape_.all())
+            if (all_set)
             {
                 hash_roll_backward();
             }
@@ -450,10 +454,15 @@ private:
             text_right = text_left;
             hash_value = 0;
 
-            for (size_t i{0}; i < shape_.size() - 1u; ++i)
+            // operations on const faster! (no proxies returned)
+            shape const & s = shape_;
+            size_t siz = s.size() - 1u;
+
+            for (size_t i{0}; i < siz; ++i)
             {
-                hash_value += shape_[i] * to_rank(*text_right);
-                hash_value *= shape_[i] ? sigma : 1;
+//                 hash_value = (s[i] ? ((hash_value + to_rank(*text_right)) * sigma) : hash_value);
+                if (s[i])
+                    hash_value = (hash_value + to_rank(*text_right)) * sigma;
                 std::ranges::advance(text_right, 1);
             }
         }
@@ -461,10 +470,11 @@ private:
         //!\brief Calculates the next hash value via rolling hash.
         void hash_roll_forward()
         {
-            hash_value -= to_rank(*(text_left)) * roll_factor;
-            hash_value += to_rank(*(text_right));
-            hash_value *= sigma;
+//             hash_value -= to_rank(*(text_left)) * roll_factor;
+//             hash_value += to_rank(*(text_right));
+//             hash_value *= sigma;
 
+            hash_value = (hash_value - to_rank(*(text_left)) * roll_factor) * sigma + to_rank(*(text_right));
             std::ranges::advance(text_left,  1);
             std::ranges::advance(text_right, 1);
         }

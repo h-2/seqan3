@@ -39,7 +39,7 @@ inline shape make_gapped_shape(size_t const k)
 }
 
 
-static void arguments(benchmark::internal::Benchmark* b)
+void arguments(benchmark::internal::Benchmark* b)
 {
     for (int32_t sequence_length : {1'000, 50'000, /*1'000'000*/})
     {
@@ -50,7 +50,7 @@ static void arguments(benchmark::internal::Benchmark* b)
     }
 }
 
-static void seqan_kmer_hash_ungapped(benchmark::State & state)
+void seqan_kmer_hash_ungapped(benchmark::State & state)
 {
     auto sequence_length = state.range(0);
     assert(sequence_length > 0);
@@ -69,7 +69,7 @@ static void seqan_kmer_hash_ungapped(benchmark::State & state)
     state.counters["Throughput[bp/s]"] = bp_per_second(sequence_length - k + 1);
 }
 
-static void seqan_kmer_hash_gapped(benchmark::State & state)
+void seqan_kmer_hash_gapped(benchmark::State & state)
 {
     auto sequence_length = state.range(0);
     assert(sequence_length > 0);
@@ -88,7 +88,7 @@ static void seqan_kmer_hash_gapped(benchmark::State & state)
     state.counters["Throughput[bp/s]"] = bp_per_second(sequence_length - k + 1);
 }
 
-static void naive_kmer_hash(benchmark::State & state)
+void naive_kmer_hash(benchmark::State & state)
 {
     auto sequence_length = state.range(0);
     assert(sequence_length > 0);
@@ -121,7 +121,7 @@ inline auto make_gapped_shape_seqan2(size_t const k)
     return s;
 }
 
-static void seqan2_kmer_hash_ungapped(benchmark::State & state)
+void seqan2_kmer_hash_ungapped(benchmark::State & state)
 {
     auto sequence_length = state.range(0);
     assert(sequence_length > 0);
@@ -146,7 +146,7 @@ static void seqan2_kmer_hash_ungapped(benchmark::State & state)
     state.counters["Throughput[bp/s]"] = bp_per_second(sequence_length - k + 1);
 }
 
-static void seqan2_kmer_hash_gapped(benchmark::State & state)
+void seqan2_kmer_hash_gapped(benchmark::State & state)
 {
     auto sequence_length = state.range(0);
     assert(sequence_length > 0);
