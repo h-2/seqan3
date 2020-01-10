@@ -15,6 +15,7 @@
 #include <cmath>
 
 #include <seqan3/alphabet/concept.hpp>
+#include <seqan3/range/container/small_vector.hpp>
 #include <seqan3/range/hash.hpp>
 #include <seqan3/search/kmer_index/shape.hpp>
 
@@ -132,9 +133,21 @@ private:
 
             roll_factor = std::pow(sigma, std::ranges::size(shape_) - 1);
 
-            hash_full();
+            shape const & s = shape_;
+            all_set = s.all();
 
-            all_set = shape_.all();
+//             shape_rank_diffs.push_back(1);
+            uint8_t last_rank = 0;
+            for (uint8_t i = 1; i < s.size(); ++i)
+            {
+                if (s[i])
+                {
+                    shape_rank_diffs.push_back(i - last_rank);
+                    last_rank = i;
+                }
+            }
+
+            hash_full();
         }
         //!\}
 
@@ -392,6 +405,8 @@ private:
 
         bool all_set = false;
 
+        small_vector<uint8_t, 58> shape_rank_diffs;
+
         //!\brief Increments iterator by 1.
         void hash_forward()
         {
@@ -452,18 +467,23 @@ private:
         void hash_full()
         {
             text_right = text_left;
-            hash_value = 0;
+//             hash_value = 0;
+
+//             auto cpy_it = text_left;
 
             // operations on const faster! (no proxies returned)
-            shape const & s = shape_;
-            size_t siz = s.size() - 1u;
+//             shape const & s = shape_;
+//             size_t siz = s.size() - 1u;
 
-            for (size_t i{0}; i < siz; ++i)
+            hash_value = to_rank(*text_right);// * sigma;
+            for (uint8_t r : shape_rank_diffs)
             {
+                std::ranges::advance(text_right, r);
 //                 hash_value = (s[i] ? ((hash_value + to_rank(*text_right)) * sigma) : hash_value);
-                if (s[i])
-                    hash_value = (hash_value + to_rank(*text_right)) * sigma;
-                std::ranges::advance(text_right, 1);
+//                 if (s[i])
+//                     hash_value = (hash_value + to_rank(*text_right)) * sigma;
+                hash_value = hash_value * sigma + to_rank(*text_right);
+
             }
         }
 
