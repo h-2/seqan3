@@ -7,11 +7,19 @@
 
 #include <benchmark/benchmark.h>
 
+#include <chrono>
+#include <thread>
+
 #include <seqan3/alphabet/nucleotide/dna4.hpp>
 #include <seqan3/search/algorithm/all.hpp>
 #include <seqan3/test/performance/sequence_generator.hpp>
 #include <seqan3/range/views/join.hpp>
 #include <seqan3/range/views/to.hpp>
+
+#if SEQAN3_HAS_SEQAN2
+#include <seqan/find.h>
+#include <seqan/index.h>
+#endif
 
 struct options
 {
@@ -22,7 +30,10 @@ struct options
     double const prob_insertion;
     double const prob_deletion;
     uint8_t const simulated_errors;
-    uint8_t const searched_errors;
+    uint8_t const searched_total_errors;
+    uint8_t const searched_substitution_errors;
+    uint8_t const searched_insertion_errors;
+    uint8_t const searched_deletion_errors;
     uint8_t const strata;
     double const stddev{0};
     uint32_t repeats{20};
@@ -157,7 +168,39 @@ void unidirectional_search_all_collection(benchmark::State & state, options && o
     }
 
     seqan3::fm_index index{collection};
-    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_errors}};
+    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_total_errors},
+                                                              seqan3::search_cfg::substitution{o.searched_substitution_errors},
+                                                              seqan3::search_cfg::insertion{o.searched_insertion_errors},
+                                                              seqan3::search_cfg::deletion{o.searched_deletion_errors}};
+
+    for (auto _ : state)
+        auto results = seqan3::search(reads, index, cfg);
+}
+
+//============================================================================
+//  undirectional; trivial_search, collection, dna4, all-mapping
+//============================================================================
+
+void bidirectional_search_all_collection(benchmark::State & state, options && o)
+{
+    size_t set_size = 10;
+    std::vector<std::vector<seqan3::dna4>> collection;
+    std::vector<std::vector<seqan3::dna4>> reads;
+    for (size_t i = 0; i < set_size; ++i)
+    {
+        collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(collection.back(), o.number_of_reads,
+                                                                          o.read_length, o.simulated_errors,
+                                                                          o.prob_insertion, o.prob_deletion,
+                                                                          o.stddev, i);
+        std::ranges::move(seq_reads, std::ranges::back_inserter(reads));
+    }
+
+    seqan3::bi_fm_index index{collection};
+    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_total_errors},
+                                                              seqan3::search_cfg::substitution{o.searched_substitution_errors},
+                                                              seqan3::search_cfg::insertion{o.searched_insertion_errors},
+                                                              seqan3::search_cfg::deletion{o.searched_deletion_errors}};
 
     for (auto _ : state)
         auto results = seqan3::search(reads, index, cfg);
@@ -178,7 +221,10 @@ void unidirectional_search_all(benchmark::State & state, options && o)
     std::vector<std::vector<seqan3::dna4>> reads = generate_reads(ref, o.number_of_reads, o.read_length,
                                                                   o.simulated_errors, o.prob_insertion,
                                                                   o.prob_deletion, o.stddev);
-    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_errors}};
+    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_total_errors},
+                                                              seqan3::search_cfg::substitution{o.searched_substitution_errors},
+                                                              seqan3::search_cfg::insertion{o.searched_insertion_errors},
+                                                              seqan3::search_cfg::deletion{o.searched_deletion_errors}};
 
     for (auto _ : state)
         auto results = seqan3::search(reads, index, cfg);
@@ -199,7 +245,10 @@ void bidirectional_search_all(benchmark::State & state, options && o)
     std::vector<std::vector<seqan3::dna4>> reads = generate_reads(ref, o.number_of_reads, o.read_length,
                                                                   o.simulated_errors, o.prob_insertion,
                                                                   o.prob_deletion, o.stddev);
-    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_errors}};
+    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_total_errors},
+                                                              seqan3::search_cfg::substitution{o.searched_substitution_errors},
+                                                              seqan3::search_cfg::insertion{o.searched_insertion_errors},
+                                                              seqan3::search_cfg::deletion{o.searched_deletion_errors}};
 
     for (auto _ : state)
         auto results = seqan3::search(reads, index, cfg);
@@ -220,7 +269,10 @@ void unidirectional_search_stratified(benchmark::State & state, options && o)
     std::vector<std::vector<seqan3::dna4>> reads = generate_reads(ref, o.number_of_reads, o.read_length,
                                                                   o.simulated_errors, o.prob_insertion,
                                                                   o.prob_deletion, o.stddev);
-    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_errors}} |
+    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_total_errors},
+                                                              seqan3::search_cfg::substitution{o.searched_substitution_errors},
+                                                              seqan3::search_cfg::insertion{o.searched_insertion_errors},
+                                                              seqan3::search_cfg::deletion{o.searched_deletion_errors}} |
                         seqan3::search_cfg::mode{seqan3::search_cfg::strata{o.strata}};
 
     for (auto _ : state)
@@ -242,13 +294,328 @@ void bidirectional_search_stratified(benchmark::State & state, options && o)
     std::vector<std::vector<seqan3::dna4>> reads = generate_reads(ref, o.number_of_reads, o.read_length,
                                                                   o.simulated_errors, o.prob_insertion,
                                                                   o.prob_deletion, o.stddev);
-    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_errors}} |
+    seqan3::configuration cfg = seqan3::search_cfg::max_error{seqan3::search_cfg::total{o.searched_total_errors},
+                                                              seqan3::search_cfg::substitution{o.searched_substitution_errors},
+                                                              seqan3::search_cfg::insertion{o.searched_insertion_errors},
+                                                              seqan3::search_cfg::deletion{o.searched_deletion_errors}} |
                         seqan3::search_cfg::mode{seqan3::search_cfg::strata{o.strata}};
 
     for (auto _ : state)
         auto results = seqan3::search(reads, index, cfg);
 }
 
+#if SEQAN3_HAS_SEQAN2
+
+template <typename range_t, seqan3::alphabet original_alphabet_t>
+range_t convert_single_range(std::vector<original_alphabet_t> const & original_range)
+{
+    range_t result_range;
+    seqan::reserve(result_range, std::ranges::size(original_range));
+
+    for (auto const & element : original_range)
+        appendValue(result_range, seqan3::to_char(element));
+
+    return result_range;
+}
+
+template <typename range_t, seqan3::alphabet original_alphabet_t>
+seqan::StringSet<range_t> convert_range_of_range(std::vector<std::vector<original_alphabet_t>> const & original_range)
+{
+    seqan::StringSet<range_t> result_range;
+
+    for (auto const & single_range : original_range)
+        appendValue(result_range, convert_single_range<range_t>(single_range));
+
+    return result_range;
+}
+
+//============================================================================
+//  SEQAN2 undirectional; trivial_search, single, dna4, all-mapping
+//============================================================================
+
+void seqan2_unidirectional_search(benchmark::State & state, options && o)
+{
+    using reference_index_t = seqan::Index<seqan::DnaString, seqan::FMIndex<>>;
+
+    std::vector<seqan3::dna4> tmp_ref = (o.has_repeats) ?
+                                        generate_repeating_sequence<seqan3::dna4>(2 * o.sequence_length / o.repeats,
+                                                                                  o.repeats, 0.5, 0) :
+                                        seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, 0);
+
+    seqan::DnaString ref{convert_single_range<seqan::DnaString>(tmp_ref)};
+
+    reference_index_t index{ref};
+    seqan::indexRequire(index, seqan::FibreSA());
+
+    std::vector<std::vector<seqan3::dna4>> tmp_reads = generate_reads(tmp_ref, o.number_of_reads, o.read_length,
+                                                                      o.simulated_errors, o.prob_insertion,
+                                                                      o.prob_deletion, o.stddev);
+
+    seqan::StringSet<seqan::DnaString> reads{convert_range_of_range<seqan::DnaString>(tmp_reads)};
+
+    std::vector<size_t> result;
+
+    if (o.searched_total_errors == 0)
+    {
+        for (auto _ : state)
+        {
+            seqan::Finder<reference_index_t> finder{index};
+
+            for (auto const & read : reads)
+            {
+                seqan::find(finder, read);
+                result.push_back(seqan::position(finder));
+            }
+
+            result = std::vector<size_t>{};
+        }
+    }
+    else
+    {
+        auto delegate = [&result](auto const & text_it, auto const &, auto const &)
+        {
+            for (auto && text_pos : seqan::getOccurrences(text_it))
+                result.push_back(text_pos);
+        };
+
+        for (auto _ : state)
+        {
+            seqan::find(index, reads, o.searched_total_errors, delegate, seqan::Backtracking<seqan::HammingDistance>());
+            result = std::vector<size_t>{};
+        }
+    }
+}
+
+//============================================================================
+//  SEQAN2 undirectional; trivial_search, collection, dna4, all-mapping
+//============================================================================
+
+void seqan2_unidirectional_search_collection(benchmark::State & state, options && o)
+{
+    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::FMIndex<>>;
+
+    size_t set_size = 10;
+    std::vector<std::vector<seqan3::dna4>> tmp_collection;
+    std::vector<std::vector<seqan3::dna4>> tmp_reads;
+    for (size_t i = 0; i < set_size; ++i)
+    {
+        tmp_collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(tmp_collection.back(), o.number_of_reads,
+                                                                          o.read_length, o.simulated_errors,
+                                                                          o.prob_insertion, o.prob_deletion,
+                                                                          o.stddev, i);
+        std::ranges::move(seq_reads, std::ranges::back_inserter(tmp_reads));
+    }
+
+    seqan::StringSet<seqan::DnaString> collection{convert_range_of_range<seqan::DnaString>(tmp_collection)};
+
+    reference_index_t index{collection};
+    seqan::indexRequire(index, seqan::FibreSA());
+
+    seqan::StringSet<seqan::DnaString> reads{convert_range_of_range<seqan::DnaString>(tmp_reads)};
+
+    std::vector<seqan::Pair<uint32_t, uint32_t>> result;
+
+    if (o.searched_total_errors == 0)
+    {
+        for (auto _ : state)
+        {
+            seqan::Finder<reference_index_t> finder{index};
+
+            for (auto const & read : reads)
+            {
+                seqan::find(finder, read);
+                result.push_back(seqan::position(finder));
+            }
+
+            result = std::vector<seqan::Pair<uint32_t, uint32_t>>{};
+        }
+    }
+    else
+    {
+        auto delegate = [&result](auto const & text_it, auto const &, auto const &)
+        {
+            for (auto && text_pos : seqan::getOccurrences(text_it))
+                result.push_back(text_pos);
+        };
+
+        for (auto _ : state)
+        {
+            seqan::find(index, reads, o.searched_total_errors, delegate, seqan::Backtracking<seqan::HammingDistance>());
+            result = std::vector<seqan::Pair<uint32_t, uint32_t>>{};
+        }
+    }
+}
+
+//============================================================================
+//  SEQAN2 bidirectional; trivial_search, single, dna4, all-mapping
+//============================================================================
+
+template <uint8_t lower_bound, uint8_t upper_bound>
+void seqan2_bidirectional_search(benchmark::State & state, options && o)
+{
+    using reference_index_t = seqan::Index<seqan::DnaString, seqan::BidirectionalIndex<seqan::FMIndex<>>>;
+
+    std::vector<seqan3::dna4> tmp_ref = (o.has_repeats) ?
+                                        generate_repeating_sequence<seqan3::dna4>(2 * o.sequence_length / o.repeats,
+                                                                                  o.repeats, 0.5, 0) :
+                                        seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, 0);
+
+    seqan::DnaString ref{convert_single_range<seqan::DnaString>(tmp_ref)};
+
+    reference_index_t index{ref};
+    seqan::indexCreate(index, seqan::FibreSA());
+
+    std::vector<std::vector<seqan3::dna4>> tmp_reads = generate_reads(tmp_ref, o.number_of_reads, o.read_length,
+                                                                      o.simulated_errors, o.prob_insertion,
+                                                                      o.prob_deletion, o.stddev);
+
+    seqan::StringSet<seqan::DnaString> reads{convert_range_of_range<seqan::DnaString>(tmp_reads)};
+
+    std::vector<size_t> result;
+
+    auto delegate = [&result](auto const & text_it, auto const &, auto const &)
+    {
+        for (auto && text_pos : seqan::getOccurrences(text_it))
+            result.push_back(text_pos);
+    };
+
+    for (auto _ : state)
+    {
+        seqan::find<lower_bound, upper_bound>(delegate, index, reads, seqan::HammingDistance(), seqan::Serial());
+        result = std::vector<size_t>{};
+    }
+}
+
+//============================================================================
+//  SEQAN2 bidirectional; trivial_search, collection, dna4, all-mapping
+//============================================================================
+
+template <uint8_t lower_bound, uint8_t upper_bound>
+void seqan2_bidirectional_search_collection(benchmark::State & state, options && o)
+{
+    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::BidirectionalIndex<seqan::FMIndex<>>>;
+
+    size_t set_size = 10;
+    std::vector<std::vector<seqan3::dna4>> tmp_collection;
+    std::vector<std::vector<seqan3::dna4>> tmp_reads;
+    for (size_t i = 0; i < set_size; ++i)
+    {
+        tmp_collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(tmp_collection.back(), o.number_of_reads,
+                                                                          o.read_length, o.simulated_errors,
+                                                                          o.prob_insertion, o.prob_deletion,
+                                                                          o.stddev, i);
+        std::ranges::move(seq_reads, std::ranges::back_inserter(tmp_reads));
+    }
+
+    seqan::StringSet<seqan::DnaString> collection{convert_range_of_range<seqan::DnaString>(tmp_collection)};
+
+    reference_index_t index{collection};
+    seqan::indexCreate(index, seqan::FibreSA());
+
+    seqan::StringSet<seqan::DnaString> reads{convert_range_of_range<seqan::DnaString>(tmp_reads)};
+
+    std::vector<seqan::Pair<uint32_t, uint32_t>> result;
+
+    auto delegate = [&result](auto const & text_it, auto const &, auto const &)
+    {
+        for (auto && text_pos : seqan::getOccurrences(text_it))
+            result.push_back(text_pos);
+    };
+
+    for (auto _ : state)
+    {
+        seqan::find<lower_bound, upper_bound>(delegate, index, reads, seqan::HammingDistance(), seqan::Serial());
+        result = std::vector<seqan::Pair<uint32_t, uint32_t>>{};
+    }
+}
+
+auto seqan2_bidirectional_search_0 = seqan2_bidirectional_search<0, 0>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_0, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_collection_0 = seqan2_bidirectional_search_collection<0, 0>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_0, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_1 = seqan2_bidirectional_search<0, 1>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_1, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_collection_1 = seqan2_bidirectional_search_collection<0, 1>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_1, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_2 = seqan2_bidirectional_search<0, 2>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_2, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_collection_2 = seqan2_bidirectional_search_collection<0, 2>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_2, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_3 = seqan2_bidirectional_search<0, 3>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_3, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+
+auto seqan2_bidirectional_search_collection_3 = seqan2_bidirectional_search_collection<0, 3>;
+BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_3, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+
+BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_0,
+                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+
+BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_1,
+                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+
+BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_2,
+                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+
+BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_3,
+                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+#endif
+/*
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, highErrorReadsSearch0,
                   options{10'000, false, 10, 50, 0.18, 0.18, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, highErrorReadsSearch1,
@@ -329,7 +696,7 @@ BENCHMARK_CAPTURE(bidirectional_search_stratified, highErrorReadsSearch3Strata2R
                   options{50'000, true, 50, 50, 0.30, 0.30, 0, 3, 2, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_stratified, highErrorReadsSearch3Strata2RepLong,
                   options{100'000, true, 50, 50, 0.30, 0.30, 0, 3, 2, 1.75});
-
+*/
 // ============================================================================
 //  instantiate tests
 // ============================================================================
