@@ -335,7 +335,7 @@ seqan::StringSet<range_t> convert_range_of_range(std::vector<std::vector<origina
 
 void seqan2_unidirectional_search(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::DnaString, seqan::FMIndex<>>;
+    using reference_index_t = seqan::Index<seqan::DnaString, seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>;
 
     std::vector<seqan3::dna4> tmp_ref = (o.has_repeats) ?
                                         generate_repeating_sequence<seqan3::dna4>(2 * o.sequence_length / o.repeats,
@@ -392,7 +392,7 @@ void seqan2_unidirectional_search(benchmark::State & state, options && o)
 
 void seqan2_unidirectional_search_collection(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::FMIndex<>>;
+    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>;
 
     size_t set_size = 10;
     std::vector<std::vector<seqan3::dna4>> tmp_collection;
@@ -454,7 +454,7 @@ void seqan2_unidirectional_search_collection(benchmark::State & state, options &
 template <uint8_t lower_bound, uint8_t upper_bound>
 void seqan2_bidirectional_search(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::DnaString, seqan::BidirectionalIndex<seqan::FMIndex<>>>;
+    using reference_index_t = seqan::Index<seqan::DnaString, seqan::BidirectionalIndex<seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>>;
 
     std::vector<seqan3::dna4> tmp_ref = (o.has_repeats) ?
                                         generate_repeating_sequence<seqan3::dna4>(2 * o.sequence_length / o.repeats,
@@ -494,7 +494,7 @@ void seqan2_bidirectional_search(benchmark::State & state, options && o)
 template <uint8_t lower_bound, uint8_t upper_bound>
 void seqan2_bidirectional_search_collection(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::BidirectionalIndex<seqan::FMIndex<>>>;
+    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::BidirectionalIndex<seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>>;
 
     size_t set_size = 10;
     std::vector<std::vector<seqan3::dna4>> tmp_collection;
