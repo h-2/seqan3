@@ -159,7 +159,7 @@ void unidirectional_search_all_collection(benchmark::State & state, options && o
     std::vector<std::vector<seqan3::dna4>> reads;
     for (size_t i = 0; i < set_size; ++i)
     {
-        collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length / set_size, 0, i));
         std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(collection.back(), o.number_of_reads,
                                                                           o.read_length, o.simulated_errors,
                                                                           o.prob_insertion, o.prob_deletion,
@@ -188,7 +188,7 @@ void bidirectional_search_all_collection(benchmark::State & state, options && o)
     std::vector<std::vector<seqan3::dna4>> reads;
     for (size_t i = 0; i < set_size; ++i)
     {
-        collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length / set_size, 0, i));
         std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(collection.back(), o.number_of_reads,
                                                                           o.read_length, o.simulated_errors,
                                                                           o.prob_insertion, o.prob_deletion,
@@ -335,7 +335,8 @@ seqan::StringSet<range_t> convert_range_of_range(std::vector<std::vector<origina
 
 void seqan2_unidirectional_search(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::DnaString, seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>;
+//     using reference_index_t = seqan::Index<seqan::DnaString, seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>;
+    using reference_index_t = seqan::Index<seqan::DnaString, seqan::FMIndex<void>>;
 
     std::vector<seqan3::dna4> tmp_ref = (o.has_repeats) ?
                                         generate_repeating_sequence<seqan3::dna4>(2 * o.sequence_length / o.repeats,
@@ -355,22 +356,22 @@ void seqan2_unidirectional_search(benchmark::State & state, options && o)
 
     std::vector<size_t> result;
 
-    if (o.searched_total_errors == 0)
-    {
-        for (auto _ : state)
-        {
-            seqan::Finder<reference_index_t> finder{index};
-
-            for (auto const & read : reads)
-            {
-                seqan::find(finder, read);
-                result.push_back(seqan::position(finder));
-            }
-
-            result = std::vector<size_t>{};
-        }
-    }
-    else
+//     if (o.searched_total_errors == 0)
+//     {
+//         for (auto _ : state)
+//         {
+//             seqan::Finder<reference_index_t> finder{index};
+//
+//             for (auto const & read : reads)
+//             {
+//                 seqan::find(finder, read);
+//                 result.push_back(seqan::position(finder));
+//             }
+//
+//             result = std::vector<size_t>{};
+//         }
+//     }
+//     else
     {
         auto delegate = [&result](auto const & text_it, auto const &, auto const &)
         {
@@ -392,14 +393,15 @@ void seqan2_unidirectional_search(benchmark::State & state, options && o)
 
 void seqan2_unidirectional_search_collection(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>;
+//     using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>;
+    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::FMIndex<void>>;
 
     size_t set_size = 10;
     std::vector<std::vector<seqan3::dna4>> tmp_collection;
     std::vector<std::vector<seqan3::dna4>> tmp_reads;
     for (size_t i = 0; i < set_size; ++i)
     {
-        tmp_collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        tmp_collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length / set_size, 0, i));
         std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(tmp_collection.back(), o.number_of_reads,
                                                                           o.read_length, o.simulated_errors,
                                                                           o.prob_insertion, o.prob_deletion,
@@ -416,22 +418,22 @@ void seqan2_unidirectional_search_collection(benchmark::State & state, options &
 
     std::vector<seqan::Pair<uint32_t, uint32_t>> result;
 
-    if (o.searched_total_errors == 0)
-    {
-        for (auto _ : state)
-        {
-            seqan::Finder<reference_index_t> finder{index};
-
-            for (auto const & read : reads)
-            {
-                seqan::find(finder, read);
-                result.push_back(seqan::position(finder));
-            }
-
-            result = std::vector<seqan::Pair<uint32_t, uint32_t>>{};
-        }
-    }
-    else
+//     if (o.searched_total_errors == 0)
+//     {
+//         for (auto _ : state)
+//         {
+//             seqan::Finder<reference_index_t> finder{index};
+//
+//             for (auto const & read : reads)
+//             {
+//                 seqan::find(finder, read);
+//                 result.push_back(seqan::position(finder));
+//             }
+//
+//             result = std::vector<seqan::Pair<uint32_t, uint32_t>>{};
+//         }
+//     }
+//     else
     {
         auto delegate = [&result](auto const & text_it, auto const &, auto const &)
         {
@@ -454,7 +456,8 @@ void seqan2_unidirectional_search_collection(benchmark::State & state, options &
 template <uint8_t lower_bound, uint8_t upper_bound>
 void seqan2_bidirectional_search(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::DnaString, seqan::BidirectionalIndex<seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>>;
+//     using reference_index_t = seqan::Index<seqan::DnaString, seqan::BidirectionalIndex<seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>>;
+    using reference_index_t = seqan::Index<seqan::DnaString, seqan::BidirectionalIndex<seqan::FMIndex<void>>>;
 
     std::vector<seqan3::dna4> tmp_ref = (o.has_repeats) ?
                                         generate_repeating_sequence<seqan3::dna4>(2 * o.sequence_length / o.repeats,
@@ -494,14 +497,15 @@ void seqan2_bidirectional_search(benchmark::State & state, options && o)
 template <uint8_t lower_bound, uint8_t upper_bound>
 void seqan2_bidirectional_search_collection(benchmark::State & state, options && o)
 {
-    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::BidirectionalIndex<seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>>;
+//     using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::BidirectionalIndex<seqan::FMIndex<void, seqan::FastFMIndexConfig<void, uint32_t>>>>;
+    using reference_index_t = seqan::Index<seqan::StringSet<seqan::DnaString>, seqan::BidirectionalIndex<seqan::FMIndex<void>>>;
 
     size_t set_size = 10;
     std::vector<std::vector<seqan3::dna4>> tmp_collection;
     std::vector<std::vector<seqan3::dna4>> tmp_reads;
     for (size_t i = 0; i < set_size; ++i)
     {
-        tmp_collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length, 0, i));
+        tmp_collection.push_back(seqan3::test::generate_sequence<seqan3::dna4>(o.sequence_length / set_size, 0, i));
         std::vector<std::vector<seqan3::dna4>> seq_reads = generate_reads(tmp_collection.back(), o.number_of_reads,
                                                                           o.read_length, o.simulated_errors,
                                                                           o.prob_insertion, o.prob_deletion,
@@ -533,87 +537,87 @@ void seqan2_bidirectional_search_collection(benchmark::State & state, options &&
 
 auto seqan2_bidirectional_search_0 = seqan2_bidirectional_search<0, 0>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_0, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_collection_0 = seqan2_bidirectional_search_collection<0, 0>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_0, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_1 = seqan2_bidirectional_search<0, 1>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_1, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_collection_1 = seqan2_bidirectional_search_collection<0, 1>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_1, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_2 = seqan2_bidirectional_search<0, 2>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_2, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_collection_2 = seqan2_bidirectional_search_collection<0, 2>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_2, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_3 = seqan2_bidirectional_search<0, 3>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_3, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 
 auto seqan2_bidirectional_search_collection_3 = seqan2_bidirectional_search_collection<0, 3>;
 BENCHMARK_CAPTURE(seqan2_bidirectional_search_collection_3, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(bidirectional_search_all_collection, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 
 BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_0,
-                  options{10'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 0, 0, 0, 0, 0, 0, 1.75});
 
 BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_1,
-                  options{10'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 1, 1, 1, 0, 0, 0, 1.75});
 
 BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_2,
-                  options{10'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 2, 2, 2, 0, 0, 0, 1.75});
 
 BENCHMARK_CAPTURE(seqan2_unidirectional_search, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(seqan2_unidirectional_search_collection, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, hamming_3,
-                  options{10'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
+                  options{100'000, false, 10, 50, 0, 0, 3, 3, 3, 0, 0, 0, 1.75});
 #endif
 /*
 BENCHMARK_CAPTURE(unidirectional_search_all_collection, highErrorReadsSearch0,
