@@ -90,6 +90,7 @@ TYPED_TEST(nucleotide, view_translate)
     std::vector<std::vector<seqan3::aa27> > cmp5{{"TYVR"_aa27}, {"VRT"_aa27}, {"SRAL"_aa27}, {"ESFS"_aa27}};
     std::vector<std::vector<seqan3::aa27> > cmp6{{"CMHA"_aa27}, {"MHAC"_aa27}, {"SSRN"_aa27}, {"RFRE"_aa27}};
     std::vector<std::vector<seqan3::aa27> > cmp7{{"CMHA"_aa27}};
+    std::vector<std::vector<seqan3::aa27> > cmp8{{"AHMC"_aa27}, {"CAHM"_aa27}, {"NRSS"_aa27}, {"ERFR"_aa27}};
 
     // default parameter translation_frames
     auto v1 = vec | seqan3::views::translate_join;
@@ -173,6 +174,16 @@ TYPED_TEST(nucleotide, view_translate)
     EXPECT_EQ(v11.size(), cmp6.size());
     for (unsigned i = 0; i < v11.size(); i++)
         EXPECT_RANGE_EQ(v11[i], cmp6[i]);
+
+    // combinability
+    auto v12 = vec
+             | seqan3::views::complement
+             | seqan3::views::translate_join(seqan3::translation_frames::FWD_REV_0)
+             | seqan3::views::deep{std::views::reverse};
+    // == [[A,H,M,C],[C,A,H,M],[N,R,S,S],[E,R,F,R]]
+    EXPECT_EQ(v12.size(), cmp8.size());
+    for (unsigned i = 0; i < v12.size(); i++)
+        EXPECT_RANGE_EQ(v12[i], cmp8[i]);
 }
 
 TYPED_TEST(nucleotide, view_translate_concepts)
