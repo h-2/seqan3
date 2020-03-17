@@ -271,23 +271,6 @@ public:
     {
         std::apply(expander, *this);
     }
-    }
-
-    //!\brief Auxiliary functions for clear().
-    template <typename t>
-    //!\cond
-        requires requires (t & v) { v.clear(); }
-    //!\endcond
-    static constexpr void clear_impl2(t & v) noexcept
-    {
-        v.clear();
-    }
-
-    //!\brief Auxiliary functions for clear().
-    template <typename t>
-    static constexpr void clear_impl2(t & v) noexcept
-    {
-        v = {};
 };
 
 } // namespace seqan3

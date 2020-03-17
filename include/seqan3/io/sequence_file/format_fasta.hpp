@@ -341,56 +341,80 @@ private:
     {
         auto char_sequence = seq | views::to_char;
 
+        if (options.fasta_letters_per_line > 0)
+        {
             /* Using `views::interleave` is probably the way to go but that needs performance-tuning.*/
             auto it = std::ranges::begin(char_sequence);
             auto end = std::ranges::end(char_sequence);
 
             while (it != end)
-                                  : std::numeric_limits<ptrdiff_t>::max();
-
-            ptrdiff_t chars_left = std::ranges::size(seq);
-            auto source_it = std::ranges::begin(seq);
-
-            while (chars_left > 0)
             {
-                ptrdiff_t chars_this_time = std::min<ptrdiff_t>(chars_left, line_length);
-                for (ptrdiff_t i = 0; i < chars_this_time; ++i, ++source_it)
-                    stream_it = to_char(*source_it);
-
-                chars_left -= chars_this_time;
-
-                detail::write_eol(stream_it, options.add_carriage_return);
-            }
-        }
-        else // have to iterate character by character
-        {
-            if (options.fasta_letters_per_line == 0)
-            {
-                for (auto c : seq)
-                    stream_it = to_char(c);
-                detail::write_eol(stream_it, options.add_carriage_return);
-            }
-            else
-            {
-                // This may not be the most efficient implementation
-                {
                 /* Note: This solution is slightly suboptimal for sized but non-random-access ranges.*/
                 auto current_end = it;
                 size_t steps = std::ranges::advance(current_end, options.fasta_letters_per_line, end);
                 using subrange_t = std::ranges::subrange<decltype(it), decltype(it), std::ranges::subrange_kind::sized>;
                 it = stream_it.write_range(subrange_t{it, current_end, (options.fasta_letters_per_line - steps)});
                 stream_it.write_end_of_line(options.add_carriage_return);
-                }
             }
-        }
-        {
         }
         else
         {
             stream_it.write_range(char_sequence);
             stream_it.write_end_of_line(options.add_carriage_return);
         }
-#endif // SEQAN3_WORKAROUND_VIEW_PERFORMANCE
+
+//         auto char_sequence = seq | views::to_char;
+//
+//             /* Using `views::interleave` is probably the way to go but that needs performance-tuning.*/
+//             auto it = std::ranges::begin(char_sequence);
+//             auto end = std::ranges::end(char_sequence);
+//
+//             while (it != end)
+//                                   : std::numeric_limits<ptrdiff_t>::max();
+//
+//             ptrdiff_t chars_left = std::ranges::size(seq);
+//             auto source_it = std::ranges::begin(seq);
+//
+//             while (chars_left > 0)
+//             {
+//                 ptrdiff_t chars_this_time = std::min<ptrdiff_t>(chars_left, line_length);
+//                 for (ptrdiff_t i = 0; i < chars_this_time; ++i, ++source_it)
+//                     stream_it = to_char(*source_it);
+//
+//                 chars_left -= chars_this_time;
+//
+//                 detail::write_eol(stream_it, options.add_carriage_return);
+//             }
+//         }
+//         else // have to iterate character by character
+//         {
+//             if (options.fasta_letters_per_line == 0)
+//             {
+//                 for (auto c : seq)
+//                     stream_it = to_char(c);
+//                 detail::write_eol(stream_it, options.add_carriage_return);
+//             }
+//             else
+//             {
+//                 // This may not be the most efficient implementation
+//                 {
+//                 /* Note: This solution is slightly suboptimal for sized but non-random-access ranges.*/
+//                 auto current_end = it;
+//                 size_t steps = std::ranges::advance(current_end, options.fasta_letters_per_line, end);
+//                 using subrange_t = std::ranges::subrange<decltype(it), decltype(it), std::ranges::subrange_kind::sized>;
+//                 it = stream_it.write_range(subrange_t{it, current_end, (options.fasta_letters_per_line - steps)});
+//                 stream_it.write_end_of_line(options.add_carriage_return);
+//                 }
+//             }
+//         }
+//         {
+//         }
+//         else
+//         {
+//             stream_it.write_range(char_sequence);
+//             stream_it.write_end_of_line(options.add_carriage_return);
+//         }
+// #endif // SEQAN3_WORKAROUND_VIEW_PERFORMANCE
     }
 };
 
