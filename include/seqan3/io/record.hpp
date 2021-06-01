@@ -1,6 +1,7 @@
 // -----------------------------------------------------------------------------------------------------
-// Copyright (c) 2006-2020, Knut Reinert & Freie Universität Berlin
-// Copyright (c) 2016-2020, Knut Reinert & MPI für molekulare Genetik
+// Copyright (c) 2006-2021, Knut Reinert & Freie Universität Berlin
+// Copyright (c) 2016-2021, Knut Reinert & MPI für molekulare Genetik
+// Copyright (c) 2020-2021, deCODE Genetics
 // This file may be used, modified and/or redistributed under the terms of the 3-clause BSD-License
 // shipped with this file and also available at: https://github.com/seqan/seqan3/blob/master/LICENSE.md
 // -----------------------------------------------------------------------------------------------------
@@ -12,7 +13,6 @@
 
 #pragma once
 
-#include <limits>
 #include <tuple>
 
 #include <seqan3/core/detail/template_inspection.hpp>
@@ -59,15 +59,18 @@ namespace seqan3
  * | bit_score      |             |      ✅       |              |
  * | evalue         |             |      ✅       |              |
  */
-enum class field
+enum class field : uint64_t
 {
     // Fields used in multiple contexts ........................................
     seq,            //!< The "sequence", usually a range of nucleotides or amino acids.
     id,             //!< The identifier, usually a string.
-    qual,           //!< The qualities, usually in Phred score notation.
-    _seq_qual_deprecated, //!< [DEPRECATED] Sequence and qualities combined in one range. Use field::seq and field::qual instead.
-
-    offset,         //!< Sequence (seqan3::field::seq) relative start position (0-based), unsigned value.
+    qual,           //!< The qualities, usually in phred-score notation.
+    seq_qual,       //!< Sequence and qualities combined in one range.
+    offset,         //!< Sequence (SEQ) relative start position (0-based), unsigned value.
+    ref_id,
+    ref_seq,        //!< The (reference) "sequence" information, usually a range of nucleotides or amino acids.
+    header,         //!< A reference to the header of a file.
+    pos,            //!< Sequence (REF_SEQ) relative start position (0-based), unsigned value.
 
     // Fields unique to structure io ...........................................
     bpp,            //!< Base pair probability matrix of interactions, usually a matrix of float numbers.
@@ -75,75 +78,39 @@ enum class field
     structured_seq, //!< Sequence and fixed interactions combined in one range.
     energy,         //!< Energy of a folded sequence, represented by one float number.
     react,          //!< Reactivity values of the sequence characters given in a vector of float numbers.
-    react_err,      //!< Reactivity error values given in a vector corresponding to seqan3::field::react.
+    react_err,      //!< Reactivity error values given in a vector corresponding to REACT.
     comment,        //!< Comment field of arbitrary content, usually a string.
 
     // Fields unique to alignment io ...........................................
-    alignment,      //!< The (pairwise) alignment stored in an object that models seqan3::detail::pairwise_alignment.
-    ref_id,         //!< The identifier of the (reference) sequence that seqan3::field::seq was aligned to.
-    ref_seq,        //!< The (reference) "sequence" information, usually a range of nucleotides or amino acids.
-    ref_offset,     //!< Sequence (seqan3::field::ref_seq) relative start position (0-based), unsigned value.
-    header_ptr,     //!< A pointer to the seqan3::sam_file_header object storing header information.
-
+    qname = id,
     flag,           //!< The alignment flag (bit information), `uint16_t` value.
-    mate,           //!< The mate pair information given as a std::tuple of reference name, offset and template length.
-    mapq,           //!< The mapping quality of the seqan3::field::seq alignment, usually a Phred-scaled score.
+    rname = ref_id, //!< The identifier of the (reference) sequence that SEQ was aligned to.
+    /*pos*/
+    mapq,           //!< The mapping quality of the SEQ alignment, usually a ohred-scaled score.
     cigar,          //!< The cigar vector (std::vector<seqan3::cigar>) representing the alignment in SAM/BAM format.
-    tags,           //!< The optional tags in the SAM format, stored in a dictionary.
+    rnext,
+    pnext,
+    tlen,
+    /*seq*/
+    /*qual*/
+    optionals,      //!< The optional fields in the SAM format, stored in a dictionary.
+    /*header*/
 
-    bit_score,      //!< The bit score (statistical significance indicator), unsigned value.
-    evalue,         //!< The e-value (length normalized bit score), `double` value.
+    alignment,      //!< The (pairwise) alignment stored in an seqan3::alignment object.
+
+    // Fields unique to variant io ...........................................
+    chrom = ref_id, //
+    /*pos*/
+    /*id*/
+    /*ref*/
+    alt,
+    /*qual*/
+    filter,
+    info,
+    genotypes,
 
     // User defined field aliases .. ...........................................
-    user_defined_0, //!< Identifier for user defined file formats and specialisations.
-    user_defined_1, //!< Identifier for user defined file formats and specialisations.
-    user_defined_2, //!< Identifier for user defined file formats and specialisations.
-    user_defined_3, //!< Identifier for user defined file formats and specialisations.
-    user_defined_4, //!< Identifier for user defined file formats and specialisations.
-    user_defined_5, //!< Identifier for user defined file formats and specialisations.
-    user_defined_6, //!< Identifier for user defined file formats and specialisations.
-    user_defined_7, //!< Identifier for user defined file formats and specialisations.
-    user_defined_8, //!< Identifier for user defined file formats and specialisations.
-    user_defined_9, //!< Identifier for user defined file formats and specialisations.
-
-    // deprecated lowercase:
-    seq_qual SEQAN3_DEPRECATED_310 = _seq_qual_deprecated, //!< [DEPRECATED] Sequence and qualities combined in one range. Use field::seq and field::qual instead.
-
-    // deprecated uppercase:
-    SEQ SEQAN3_DEPRECATED_310 = seq, //!< Please use the field name in lower case.
-    ID SEQAN3_DEPRECATED_310 = id, //!< Please use the field name in lower case.
-    QUAL SEQAN3_DEPRECATED_310 = qual, //!< Please use the field name in lower case.
-    SEQ_QUAL SEQAN3_DEPRECATED_310 = _seq_qual_deprecated, //!< [DEPRECATED] Sequence and qualities combined in one range. Use field::seq and field::qual instead.
-    OFFSET SEQAN3_DEPRECATED_310 = offset, //!< Please use the field name in lower case.
-    BPP SEQAN3_DEPRECATED_310 = bpp, //!< Please use the field name in lower case.
-    STRUCTURE SEQAN3_DEPRECATED_310 = structure, //!< Please use the field name in lower case.
-    STRUCTURED_SEQ SEQAN3_DEPRECATED_310 = structured_seq, //!< Please use the field name in lower case.
-    ENERGY SEQAN3_DEPRECATED_310 = energy, //!< Please use the field name in lower case.
-    REACT SEQAN3_DEPRECATED_310 = react, //!< Please use the field name in lower case.
-    REACT_ERR SEQAN3_DEPRECATED_310 = react_err, //!< Please use the field name in lower case.
-    COMMENT SEQAN3_DEPRECATED_310 = comment, //!< Please use the field name in lower case.
-    ALIGNMENT SEQAN3_DEPRECATED_310 = alignment, //!< Please use the field name in lower case.
-    REF_ID SEQAN3_DEPRECATED_310 = ref_id, //!< Please use the field name in lower case.
-    REF_SEQ SEQAN3_DEPRECATED_310 = ref_seq, //!< Please use the field name in lower case.
-    REF_OFFSET SEQAN3_DEPRECATED_310 = ref_offset, //!< Please use the field name in lower case.
-    HEADER_PTR SEQAN3_DEPRECATED_310 = header_ptr, //!< Please use the field name in lower case.
-    FLAG SEQAN3_DEPRECATED_310 = flag, //!< Please use the field name in lower case.
-    MATE SEQAN3_DEPRECATED_310 = mate, //!< Please use the field name in lower case.
-    MAPQ SEQAN3_DEPRECATED_310 = mapq, //!< Please use the field name in lower case.
-    CIGAR SEQAN3_DEPRECATED_310 = cigar, //!< Please use the field name in lower case.
-    TAGS SEQAN3_DEPRECATED_310 = tags, //!< Please use the field name in lower case.
-    BIT_SCORE SEQAN3_DEPRECATED_310 = bit_score, //!< Please use the field name in lower case.
-    EVALUE SEQAN3_DEPRECATED_310 = evalue, //!< Please use the field name in lower case.
-    USER_DEFINED_0 SEQAN3_DEPRECATED_310 = user_defined_0, //!< Please use the field name in lower case.
-    USER_DEFINED_1 SEQAN3_DEPRECATED_310 = user_defined_1, //!< Please use the field name in lower case.
-    USER_DEFINED_2 SEQAN3_DEPRECATED_310 = user_defined_2, //!< Please use the field name in lower case.
-    USER_DEFINED_3 SEQAN3_DEPRECATED_310 = user_defined_3, //!< Please use the field name in lower case.
-    USER_DEFINED_4 SEQAN3_DEPRECATED_310 = user_defined_4, //!< Please use the field name in lower case.
-    USER_DEFINED_5 SEQAN3_DEPRECATED_310 = user_defined_5, //!< Please use the field name in lower case.
-    USER_DEFINED_6 SEQAN3_DEPRECATED_310 = user_defined_6, //!< Please use the field name in lower case.
-    USER_DEFINED_7 SEQAN3_DEPRECATED_310 = user_defined_7, //!< Please use the field name in lower case.
-    USER_DEFINED_8 SEQAN3_DEPRECATED_310 = user_defined_8, //!< Please use the field name in lower case.
-    USER_DEFINED_9 SEQAN3_DEPRECATED_310 = user_defined_9, //!< Please use the field name in lower case.
+    user_defined = uint64_t{1} << 32 , //!< Identifier for user defined file formats and specialisations.
 };
 
 // ----------------------------------------------------------------------------
@@ -223,8 +190,8 @@ struct fields
  *
  * \include test/snippet/io/record_2.cpp
  */
-template <typename field_types, typename field_ids>
-struct record : detail::transfer_template_args_onto_t<field_types, std::tuple>
+template <typename field_types_, typename field_ids_>
+struct record : detail::transfer_template_args_onto_t<field_types_, std::tuple>
 {
 private:
     //!\brief Auxiliary functions for clear().
@@ -248,6 +215,9 @@ private:
     static constexpr auto expander = [] (auto & ...args) { (clear_element(args), ...); };
 
 public:
+    using field_types = field_types_;
+    using field_ids   = field_ids_;
+
     //!\brief A specialisation of std::tuple.
     using base_type = detail::transfer_template_args_onto_t<field_types, std::tuple>;
 
@@ -273,36 +243,6 @@ public:
     {
         std::apply(expander, *this);
     }
-
-protected:
-    //!\privatesection
-
-    //!\brief A type alias for std::integral_constant
-    template <field f>
-    using field_constant = std::integral_constant<field, f>;
-
-    //!\brief This is basically the seqan3::get<f>(static_cast<tuple>(record)) implementation
-    template <field f, typename tuple_t>
-    static decltype(auto) get_impl(field_constant<f>, tuple_t && record_as_tuple)
-    {
-        static_assert(field_ids::contains(f), "The record does not contain the field you wish to retrieve.");
-#if SEQAN3_WORKAROUND_GCC_94967
-        // is_rvalue_reference_v can't be used, because tuple_t won't contain `&&` in the type due to reference
-        // collapsing
-        if constexpr (!std::is_lvalue_reference_v<tuple_t> && std::is_const_v<tuple_t>)
-        {
-            // A simple std::move(...) does not work, because it would mess up tuple_element types like `int const &`
-            using return_t = std::tuple_element_t<field_ids::index_of(f), tuple_t>;
-            return static_cast<return_t const &&>(std::get<field_ids::index_of(f)>(std::move(record_as_tuple)));
-        }
-        else
-        {
-            return std::get<field_ids::index_of(f)>(std::forward<tuple_t>(record_as_tuple));
-        }
-#else // ^^^ workaround / no workaround vvv
-        return std::get<field_ids::index_of(f)>(std::forward<tuple_t>(record_as_tuple));
-#endif // SEQAN3_WORKAROUND_GCC_94967
-    }
 };
 
 } // namespace seqan3
@@ -317,8 +257,10 @@ namespace std
  */
 template <typename field_types, typename field_ids>
 struct tuple_size<seqan3::record<field_types, field_ids>>
-    : tuple_size<typename seqan3::record<field_types, field_ids>::base_type>
-{};
+{
+    //!\brief The value member. Delegates to same value on base_type.
+    static constexpr size_t value = tuple_size_v<typename seqan3::record<field_types, field_ids>::base_type>;
+};
 
 /*!\brief Obtains the type of the specified element.
  * \implements seqan3::transformation_trait
@@ -327,8 +269,18 @@ struct tuple_size<seqan3::record<field_types, field_ids>>
  */
 template <size_t elem_no, typename field_types, typename field_ids>
 struct tuple_element<elem_no, seqan3::record<field_types, field_ids>>
-    : tuple_element<elem_no, typename seqan3::record<field_types, field_ids>::base_type>
-{};
+{
+    //!\brief The member type. Delegates to same type on base_type.
+    using type = std::tuple_element_t<elem_no, typename seqan3::record<field_types, field_ids>::base_type>;
+};
+
+// template <seqan3::field_id f, typename field_types, typename field_ids>
+// struct tuple_element<f, seqan3::record<field_types, field_ids>>
+// {
+//     static_assert(field_ids::contains(f), "The record does not contain the field you wish to retrieve.");
+//     //!\brief The member type. Delegates to same type on base_type.
+//     using type = seqan3::list_traits::at<field_types, field_ids::index_of(f)>;
+// };
 
 } // namespace std
 
@@ -336,14 +288,14 @@ namespace seqan3
 {
 
 /*!\name Free function get() interface for seqan3::record based on seqan3::field.
- * \brief This is the tuple interface via seqan3::field, e.g. `seqan3::get<seqan3::field::seq>(record)`.
+ * \brief This is the tuple interface via seqan3::field, e.g. `get<field::seq>(tuple)`.
  * \relates seqan3::record
  * \{
  */
 
 //!\brief Free function get() for seqan3::record based on seqan3::field.
 template <field f, typename field_types, typename field_ids>
-SEQAN3_DEPRECATED_310 auto & get(record<field_types, field_ids> & r)
+auto & get(record<field_types, field_ids> & r)
 {
     static_assert(field_ids::contains(f), "The record does not contain the field you wish to retrieve.");
     return std::get<field_ids::index_of(f)>(r);
@@ -351,7 +303,7 @@ SEQAN3_DEPRECATED_310 auto & get(record<field_types, field_ids> & r)
 
 //!\overload
 template <field f, typename field_types, typename field_ids>
-SEQAN3_DEPRECATED_310 auto const & get(record<field_types, field_ids> const & r)
+auto const & get(record<field_types, field_ids> const & r)
 {
     static_assert(field_ids::contains(f), "The record does not contain the field you wish to retrieve.");
     return std::get<field_ids::index_of(f)>(r);
@@ -359,7 +311,7 @@ SEQAN3_DEPRECATED_310 auto const & get(record<field_types, field_ids> const & r)
 
 //!\overload
 template <field f, typename field_types, typename field_ids>
-SEQAN3_DEPRECATED_310 auto && get(record<field_types, field_ids> && r)
+auto && get(record<field_types, field_ids> && r)
 {
     static_assert(field_ids::contains(f), "The record does not contain the field you wish to retrieve.");
     return std::get<field_ids::index_of(f)>(std::move(r));
@@ -367,17 +319,23 @@ SEQAN3_DEPRECATED_310 auto && get(record<field_types, field_ids> && r)
 
 //!\overload
 template <field f, typename field_types, typename field_ids>
-SEQAN3_DEPRECATED_310 auto const && get(record<field_types, field_ids> const && r)
+auto const && get(record<field_types, field_ids> const && r)
 {
     static_assert(field_ids::contains(f), "The record does not contain the field you wish to retrieve.");
-#if SEQAN3_WORKAROUND_GCC_94967
-    // A simple std::move(...) does not work, because it would mess up tuple_element types like `int const &`
-    using return_t = std::tuple_element_t<field_ids::index_of(f), record<field_types, field_ids>>;
-    return static_cast<return_t const &&>(std::get<field_ids::index_of(f)>(std::move(r)));
-#else // ^^^ workaround / no workaround vvv
     return std::get<field_ids::index_of(f)>(std::move(r));
-#endif // SEQAN3_WORKAROUND_GCC_94967
 }
 //!\}
 
 } // namespace seqan3
+
+
+namespace seqan3::detail
+{
+
+template <typename fields_t, typename ... parser_ts>
+constexpr auto make_record(parser_ts... parsers) -> record<type_list<parser_ts...>, fields_t>
+{
+    return {std::forward<parser_ts>(parsers)...};
+}
+
+} // namespace seqan3::detail

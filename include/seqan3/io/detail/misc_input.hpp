@@ -12,12 +12,7 @@
 
 #pragma once
 
-#include <seqan3/std/algorithm>
-#include <seqan3/std/concepts>
-#include <seqan3/std/filesystem>
 #include <iostream>
-#include <seqan3/std/ranges>
-#include <seqan3/std/span>
 #include <string>
 #include <tuple>
 
@@ -30,8 +25,11 @@
     #include <seqan3/contrib/stream/gz_istream.hpp>
 #endif
 #include <seqan3/io/detail/magic_header.hpp>
-#include <seqan3/io/exception.hpp>
-#include <seqan3/utility/detail/exposition_only_concept.hpp>
+#include <seqan3/std/algorithm>
+#include <seqan3/std/concepts>
+#include <seqan3/std/filesystem>
+#include <seqan3/std/ranges>
+#include <seqan3/std/span>
 
 namespace seqan3::detail
 {
@@ -72,7 +70,7 @@ inline bool starts_with(ref_t && reference, query_t && query)
 /*!\brief Depending on the magic bytes of the given stream, return a decompression stream or forward the primary stream.
  * \param[in] primary_stream The primary (device) stream for reading.
  * \param[in,out] filename  The associated filename; compression extensions will be stripped. [optional]
- * \returns A pointer to the secondary stream with a default deleter or a nop-deleter.
+ * \returns A pointer to the secondary stream with defaulted or NOP'ed deleter.
  * \throws seqan3::file_open_error If the magic bytes suggest compression, but is not supported/available.
  */
 template <builtin_character char_t>

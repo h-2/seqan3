@@ -14,15 +14,15 @@
 /*!\defgroup io IO
  * \brief The IO module provides stream handling formatted I/O.
  *
- * # Streams and (de-)compression {#io_compression}
+ * # stream_REMOVEMEs and (de-)compression {#io_compression}
  *
  * SeqAn works with regular iostreams as provided by the standard library, but it also handles compressed streams:
  *
- * | **Format** | **Extension**   | **Dependency**                             | **Description**                                                                                                       |
- * |:-----------|:----------------|:-------------------------------------------|:----------------------------------------------------------------------------------------------------------------------|
- * | GZip       | `.gz`¹          | [zlib](https://zlib.net/)                  | GNU-Zip, most common format on UNIX                                                                                   |
- * | BGZF       | `.gz`, `.bgzf`² | [zlib](https://zlib.net/)                  | [Blocked GZip](https://samtools.github.io/hts-specs/SAMv1.pdf), compatible extension to GZip, features parallelisation|
- * | BZip2      | `.bz2`          | [libbz2](https://www.sourceware.org/bzip2) | Stronger compression than GZip, slower to compress                                                                    |
+ * | **Format** | **Extension**   | **Dependency**                   | **Description**                                   |
+ * |:-----------|:----------------|:---------------------------------|:--------------------------------------------------|
+ * | GZip       | `.gz`¹          | [zlib](https://zlib.net/)        | GNU-Zip, most common format on UNIX               |
+ * | BGZF       | `.gz`, `.bgzf`² | [zlib](https://zlib.net/)        | [Blocked GZip](https://samtools.github.io/hts-specs/SAMv1.pdf), compatible extension to GZip, features parallelisation|
+ * | BZip2      | `.bz2`          | [libbz2](https://www.bzip.org)   | Stronger compression than GZip, slower to compress |
  *
  * <small>¹ SeqAn always assumes GZip and does not handle pure `.Z`.<br>
  * ² Some file formats like `.bam` or `.bcf` are implicitly BGZF-compressed without showing this in the
@@ -35,9 +35,6 @@
  * "magic-header" of a file suggest this, the respective stream is automatically (de-)compressed.
  *
  * The (de)compression stream wrappers are currently only used internally and not part of the API.
- *
- * The number of threads used for (de-)compression of BGZF-streams can be adjusted via
- * \ref setting_compression_threads "setting seqan3::contrib::bgzf_thread_count".
  *
  * # Formatted I/O
  *
@@ -55,15 +52,15 @@
  *
  * | **File**                      | **Formats**                                                                                                  |
  * |:------------------------------|:-------------------------------------------------------------------------------------------------------------|
- * | seqan3::sam_file_input        | seqan3::format_sam, seqan3::format_bam                                                                       |
- * | seqan3::sam_file_output       | seqan3::format_sam, seqan3::format_bam                                                                       |
+ * | seqan3::alignment_file_input  | seqan3::format_sam, seqan3::format_bam                                                                       |
+ * | seqan3::alignment_file_output | seqan3::format_sam, seqan3::format_bam                                                                       |
  * | seqan3::sequence_file_input   | seqan3::format_embl, seqan3::format_fasta, seqan3::format_fastq, seqan3::format_genbank, seqan3::format_sam  |
  * | seqan3::sequence_file_output  | seqan3::format_embl, seqan3::format_fasta, seqan3::format_fastq, seqan3::format_genbank, seqan3::format_sam  |
  * | seqan3::structure_file_input  | seqan3::format_vienna                                                                                        |
  * | seqan3::structure_file_output | seqan3::format_vienna                                                                                        |
  *
  * Some formats are available in multiple files, e.g. seqan3::format_sam can be read by seqan3::sequence_file_input
- * and by seqan3::sam_file_input. This represents different use-cases of the same file format.
+ * and by seqan3::alignment_file_input. This represents different use-cases of the same file format.
  *
  * Typically formats are supported for reading and writing, but this does not always have to be the case. See the above
  * links for more information.
@@ -103,9 +100,9 @@
 
 #pragma once
 
+#include <seqan3/io/alignment_file/all.hpp>
 #include <seqan3/io/exception.hpp>
 #include <seqan3/io/record.hpp>
-#include <seqan3/io/sam_file/all.hpp>
 #include <seqan3/io/sequence_file/all.hpp>
 #include <seqan3/io/stream/all.hpp>
 #include <seqan3/io/structure_file/all.hpp>

@@ -12,11 +12,11 @@
 
 #pragma once
 
-#include <seqan3/std/filesystem>
 #include <iostream>
 #include <string>
 #include <tuple>
 
+#include <seqan3/core/concept/core_language.hpp>
 #ifdef SEQAN3_HAS_BZIP2
     #include <seqan3/contrib/stream/bz2_ostream.hpp>
 #endif
@@ -24,8 +24,7 @@
     #include <seqan3/contrib/stream/bgzf_ostream.hpp>
     #include <seqan3/contrib/stream/gz_ostream.hpp>
 #endif
-#include <seqan3/io/exception.hpp>
-#include <seqan3/utility/detail/exposition_only_concept.hpp>
+#include <seqan3/std/filesystem>
 
 namespace seqan3::detail
 {
@@ -33,7 +32,7 @@ namespace seqan3::detail
 /*!\brief Depending on the given filename/extension, create a compression stream or just forward the primary stream.
  * \param[in] primary_stream The primary (uncompressed) stream for writing.
  * \param[in,out] filename  The associated filename; compression extensions will be stripped.
- * \returns A pointer to the secondary stream with a default deleter or a nop-deleter.
+ * \returns A pointer to the secondary stream with defaulted or NOP'ed deleter.
  * \throws seqan3::file_open_error If a compression-extension is used, but is not supported/available.
  */
 template <builtin_character char_t>
@@ -47,34 +46,26 @@ inline auto make_secondary_ostream(std::basic_ostream<char_t> & primary_stream, 
 
     std::string extension = filename.extension().string();
 
-    if (extension == ".gz")
+    if ((extension == ".gz") || (extension == ".bgzf") || (extension == ".bam"))
     {
-#ifdef SEQAN3_HAS_ZLIB
-        filename.replace_extension("");
-        return {new contrib::basic_gz_ostream<char_t>{primary_stream}, stream_deleter_default};
-#else
-        throw file_open_error{"Trying to write a gzipped file, but no ZLIB available."};
-#endif
-    }
-    else if ((extension == ".bgzf") || (extension == ".bam"))
-    {
-#ifdef SEQAN3_HAS_ZLIB
+    #ifdef SEQAN3_HAS_ZLIB
         if (extension != ".bam") // remove extension except for bam
             filename.replace_extension("");
 
-        return {new contrib::basic_bgzf_ostream<char_t>{primary_stream}, stream_deleter_default};
-#else
-        throw file_open_error{"Trying to write a bgzf'ed file, but no ZLIB available."};
-#endif
+        return {new contrib::basic_bgzf_ostream<char_t>{primary_stream},
+                stream_deleter_default};
+    #else
+        throw file_open_error{"Trying to write a gzipped file, but no ZLIB available."};
+    #endif
     }
     else if (extension == ".bz2")
     {
-#ifdef SEQAN3_HAS_BZIP2
+    #ifdef SEQAN3_HAS_BZIP2
         filename.replace_extension("");
         return {new contrib::basic_bz2_ostream<char_t>{primary_stream}, stream_deleter_default};
-#else
+    #else
         throw file_open_error{"Trying to write a bzipped file, but no libbz2 available."};
-#endif
+    #endif
     }
     else if (extension == ".zst")
     {

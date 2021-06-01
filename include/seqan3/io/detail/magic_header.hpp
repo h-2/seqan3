@@ -18,9 +18,9 @@
 #include <seqan3/std/type_traits>
 #include <vector>
 
+#include <seqan3/core/bit_manipulation.hpp>
+#include <seqan3/core/concept/core_language.hpp>
 #include <seqan3/core/detail/template_inspection.hpp>
-#include <seqan3/utility/detail/exposition_only_concept.hpp>
-#include <seqan3/utility/detail/to_little_endian.hpp>
 #include <seqan3/utility/type_pack/traits.hpp>
 
 namespace seqan3::detail
@@ -75,7 +75,7 @@ struct bgzf_compression
     //!\brief The valid file extension for bgzf compression.
     static inline std::vector<std::string> file_extensions
     {
-        {"bgzf"}
+        {"gz", "bgz", "bgzf"}
     };
 
     //!\brief The magic byte sequence to disambiguate bgzf compressed files.
@@ -99,14 +99,14 @@ struct bgzf_compression
         static_assert(seqan3::detail::weakly_equality_comparable_with<char_t, char>,
                       "The given char type of the span must be comparable with char.");
 
-        return (header[0] == magic_header[0] &&                                                            // GZ_ID1
-                header[1] == magic_header[1] &&                                                            // GZ_ID2
-                header[2] == magic_header[2] &&                                                            // GZ_CM
-                (header[3] & magic_header[3]) != 0 &&                                                      // FLG_FEXTRA
-                to_little_endian(*reinterpret_cast<uint16_t const *>(&header[10])) == magic_header[10] &&  // BGZF_ID1
-                header[12] == magic_header[12] &&                                                          // BGZF_ID2
-                header[13] == magic_header[13] &&                                                          // BGZF_SLEN
-                to_little_endian(*reinterpret_cast<uint16_t const *>(&header[14])) == magic_header[14]);   // BGZF_XLEN
+        return (header[0] == magic_header[0] &&                                                     // GZ_ID1
+                header[1] == magic_header[1] &&                                                     // GZ_ID2
+                header[2] == magic_header[2] &&                                                     // GZ_CM
+                (header[3] & magic_header[3]) != 0 &&                                                // FLG_FEXTRA
+                to_little_endian(*reinterpret_cast<uint16_t *>(&header[10])) == magic_header[10] &&  // BGZF_ID1
+                header[12] == magic_header[12] &&                                                    // BGZF_ID2
+                header[13] == magic_header[13] &&                                                    // BGZF_SLEN
+                to_little_endian(*reinterpret_cast<uint16_t *>(&header[14])) == magic_header[14]);   // BGZF_XLEN
     }
 };
 

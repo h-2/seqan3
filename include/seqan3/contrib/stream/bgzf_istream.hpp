@@ -537,8 +537,8 @@ public:
     typedef std::basic_istream<Elem, Tr>&                          istream_reference;
     typedef basic_bgzf_istreambuf<Elem, Tr, ElemA, ByteT, ByteAT>  decompression_bgzf_streambuf_type;
 
-    basic_bgzf_istreambase(istream_reference istream_)
-        : m_buf(istream_)
+    basic_bgzf_istreambase(istream_reference istream_, size_t numThreads = bgzf_thread_count)
+        : m_buf(istream_, numThreads)
     {
         this->init(&m_buf);
     };
@@ -580,8 +580,8 @@ public:
     typedef istream_type &                                     istream_reference;
     typedef char                                               byte_type;
 
-    basic_bgzf_istream(istream_reference istream_) :
-        bgzf_istreambase_type(istream_),
+    basic_bgzf_istream(istream_reference istream_, size_t numThreads = bgzf_thread_count) :
+        bgzf_istreambase_type(istream_, numThreads),
         istream_type(bgzf_istreambase_type::rdbuf()),
         m_is_gzip(false),
         m_gbgzf_data_size(0)

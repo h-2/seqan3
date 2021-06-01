@@ -17,9 +17,60 @@
 #include <seqan3/core/detail/pack_algorithm.hpp>
 #include <seqan3/core/detail/template_inspection.hpp>
 #include <seqan3/io/exception.hpp>
+#include <seqan3/io/record.hpp>
 #include <seqan3/std/algorithm>
 #include <seqan3/std/filesystem>
 #include <seqan3/std/iterator>
+
+namespace seqan3
+{
+
+template <auto val>
+struct tag_t
+{
+    using type = decltype(val);
+    static constexpr type value = val;
+};
+
+template <auto val>
+inline constexpr tag_t<val> tag;
+
+
+} // namespace seqan3
+
+
+namespace seqan3::detail
+{
+
+template <std::ranges::input_range in_t,
+          std::ranges::output_range<std::ranges::range_reference_t<in_t>> out_t>
+void sized_range_copy(in_t && in, out_t && out)
+{
+    std::ranges::copy(in, std::cpp20::back_inserter(out));
+}
+
+template <std::ranges::input_range in_t,
+          std::ranges::output_range<std::ranges::range_reference_t<in_t>> out_t>
+    requires std::ranges::sized_range<in_t> && requires (out_t out) { out.resize(0); }
+void sized_range_copy(in_t && in, out_t && out)
+{
+    out.resize(std::ranges::size(in));
+    std::ranges::copy(in, std::ranges::begin(out));
+}
+
+template <field field_id, field ... field_ids, typename types, typename or_type>
+auto get_or(record<types, fields<field_ids...>> const & rec, or_type && or_val)
+{
+    if constexpr (((field_id == field_ids) || ...))
+        return get<field_id>(rec);
+    else
+        return or_val;
+}
+
+//TODO this needs other qualified overloads
+
+} // namespace seqan3::detail
+
 
 namespace seqan3::detail
 {

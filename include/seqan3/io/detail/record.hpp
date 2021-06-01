@@ -16,10 +16,10 @@
 
 #include <seqan3/std/ranges>
 
+#include <seqan3/core/concept/tuple.hpp>
 #include <seqan3/io/record.hpp>
-#include <seqan3/utility/tuple/concept.hpp>
+#include <seqan3/range/views/repeat.hpp>
 #include <seqan3/utility/type_list/traits.hpp>
-#include <seqan3/utility/views/repeat.hpp>
 
 namespace seqan3::detail
 {
@@ -137,20 +137,20 @@ auto const & get_or_ignore(record<field_types, field_ids> const & r)
 }
 
 //!\copydoc seqan3::detail::get_or_ignore
-template <size_t i, tuple_like tuple_t>
-auto & get_or_ignore(tuple_t & t)
+template <size_t i, template <tuple_like ...types_> typename tuple_like_t, typename ...types>
+auto & get_or_ignore(tuple_like_t<types...> & t)
 {
-    if constexpr (i < std::tuple_size_v<tuple_t>)
+    if constexpr (i < sizeof...(types))
         return std::get<i>(t);
     else
         return std::ignore;
 }
 
 //!\copydoc seqan3::detail::get_or_ignore
-template <size_t i, tuple_like tuple_t>
-auto const & get_or_ignore(tuple_t const & t)
+template <size_t i, template <tuple_like ...types_> typename tuple_like_t, typename ...types>
+auto const & get_or_ignore(tuple_like_t<types...> const & t)
 {
-    if constexpr (i < std::tuple_size_v<tuple_t>)
+    if constexpr (i < sizeof...(types))
         return std::get<i>(t);
     else
         return std::ignore;

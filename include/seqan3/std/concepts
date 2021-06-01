@@ -55,6 +55,9 @@
 namespace std
 {
 
+namespace
+{
+
 //!\addtogroup concepts
 //!\{
 
@@ -153,6 +156,8 @@ using ::ranges::relation;
 
 // [concept.strictweakorder], concept strict_weak_order
 using ::ranges::strict_weak_order;
+
+}
 
 } // namespace std
 

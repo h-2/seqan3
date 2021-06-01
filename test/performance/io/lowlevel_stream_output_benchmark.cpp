@@ -12,7 +12,7 @@
 #include <iterator>
 
 #include <seqan3/alphabet/adaptation/char.hpp>
-#include <seqan3/io/stream/detail/fast_ostreambuf_iterator.hpp>
+#include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/test/performance/sequence_generator.hpp>
 #include <seqan3/test/seqan2.hpp>
 #include <seqan3/test/tmp_filename.hpp>
@@ -34,6 +34,8 @@ enum class tag
 template <tag id>
 void write_all(benchmark::State & state)
 {
+    std::ios::sync_with_stdio(false);
+
     /* prepare file for writing */
     seqan3::test::tmp_filename filename{"foo"};
     std::ofstream os{filename.get_path(), std::ios::binary};
