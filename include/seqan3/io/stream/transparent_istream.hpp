@@ -11,6 +11,8 @@
  * \author Hannes Hauswedell <hannes.hauswedell AT decode.is>
  */
 
+#pragma once
+
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -27,18 +29,36 @@ namespace seqan3
 //!\brief Options that can be provided to seqan3::transparent_istream.
 struct transparent_istream_options
 {
-    size_t             buffer1_size = 1024 * 1024;              //!< Size of the read buffer in bytes; default is 1MB.
-    size_t             buffer2_size = 1024 * 1024 * 4;          //!< Size of the read buffer in bytes; default is 1MB.
+    //!\brief Size of the buffer used when opening a file from a filename.
+    size_t buffer1_size = 1024 * 1024;
+    //!\brief Size of the buffer used for the decompression stream.
+    size_t buffer2_size = 1024 * 1024 * 4;
+
     /*!\brief Which decompressor to use.
      *
      * \details
      *
      * In almost all cases, you will want to have this auto-detected. You can explicitly set this to
      * seqan3::compression_format::gz when opening BGZF-compressed files to use the regular, single-threaded
-     * GZ-decompressor (but you can also just set the threads to 1).
+     * GZ-decompressor, but it is simpler to just set threads to 1.
      */
-    compression_format compression  = compression_format::detect;
-    size_t             threads      = std::thread::hardware_concurrency();  //!< Maximum number of threads to use for decompression.
+    compression_format compression = compression_format::detect;
+
+    /*!\brief Maximum number of threads to use for decompression.
+     *
+     * \details
+     *
+     * This value is currently only relevant for BGZF compressed streams/files. Note that these threads refer to the
+     * total number of used threads, i.e. a value of 4 means that three extra threads are spawned. A value of 1 will
+     * result in the regular GZ decompressor being used.
+     *
+     * The default value for this is 4 or "available CPUs - 1" if that is less than 4. The reason is that for default
+     * the compression levels of the GZip blocks, performance degrades with more than 4 threads. If you use files
+     * compressed with stronger settings, more threads might be useful.
+     *
+     * **4 threads can provide up to 3.5x speed-up.**
+     */
+    size_t threads  = std::max<size_t>(1, std::min<size_t>(4, std::thread::hardware_concurrency() - 1));
 };
 
 template <typename char_t>
@@ -93,6 +113,15 @@ private:
             selected_compression = _options.compression;
             if (!detail::header_matches_dyn(selected_compression, magic_header))
                 throw file_open_error{"The file has a different compression format than the one selected."};
+        }
+
+        // Thread handling
+        if (selected_compression == compression_format::bgzf)
+        {
+            if (_options.threads == 1)
+                selected_compression = compression_format::gz;
+            else
+                --_options.threads; // bgzf spawns **additional** threads, but user sets total
         }
 
         std::span<std::string> file_extensions{};
@@ -160,7 +189,7 @@ public:
      * \param[in] options   See seqan3::transparent_istream_options.
      */
     explicit transparent_istream(std::filesystem::path filename,
-                                 transparent_istream_options const options = transparent_istream_options{}) :
+                                 transparent_istream_options options = transparent_istream_options{}) :
         primary_stream{new std::ifstream{}, stream_deleter_default},
         _options{std::move(options)},
         _filename{std::move(filename)}
@@ -182,7 +211,7 @@ public:
      * \param[in] options   See seqan3::transparent_istream_options.
      */
     explicit transparent_istream(std::istream & stream,
-                                 transparent_istream_options const options = transparent_istream_options{}) :
+                                 transparent_istream_options options = transparent_istream_options{}) :
         primary_stream{&stream, stream_deleter_noop},
         _options{std::move(options)}
     {
@@ -191,7 +220,7 @@ public:
 
     //!\overload
     explicit transparent_istream(std::istream && stream,
-                                 transparent_istream_options const options = transparent_istream_options{}) :
+                                 transparent_istream_options options = transparent_istream_options{}) :
         primary_stream{new std::istream{std::move(stream)}, stream_deleter_default},
         _options{std::move(options)}
     {

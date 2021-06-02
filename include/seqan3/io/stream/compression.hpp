@@ -11,6 +11,8 @@
  * \author Hannes Hauswedell <hannes.hauswedell AT decode.is>
  */
 
+#pragma once
+
 #include <string_view>
 
 #include <seqan3/core/platform.hpp>
