@@ -68,7 +68,7 @@ public:
 
     basic_bz2_ostreambuf(
         ostream_reference ostream_,
-        size_t block_size_100k_ ,
+        int block_size_100k_ ,
         size_t verbosity_ ,
         size_t work_factor_,
         size_t buffer_size_
@@ -101,6 +101,11 @@ private:
     int m_err;
     byte_vector_type m_output_buffer;
     char_vector_type m_buffer;
+
+    void sanitize_compression_level(int block_size_100k_)
+    {
+        block_size_100k_ = (block_size_100k_ < 0 || block_size_100k_ > 9) ? 9 : block_size_100k_;
+    }
 };
 
 // --------------------------------------------------------------------------
@@ -118,7 +123,7 @@ basic_bz2_ostreambuf<
     Elem,Tr,ElemA,ByteT,ByteAT
     >:: basic_bz2_ostreambuf(
     ostream_reference ostream_,
-    size_t block_size_100k_,
+    int block_size_100k_,
     size_t verbosity_,
     size_t work_factor_,
     size_t buffer_size_
@@ -136,9 +141,11 @@ basic_bz2_ostreambuf<
     m_bzip2_stream.avail_out=0;
     m_bzip2_stream.next_out=NULL;
 
+    sanitize_compression_level(block_size_100k_);
+
     m_err=BZ2_bzCompressInit(
         &m_bzip2_stream,
-        std::min( 9, static_cast<int>(block_size_100k_) ),
+        block_size_100k_,
         std::min( 4, static_cast<int>(verbosity_) ),
         std::min( 250, static_cast<int>(work_factor_) )
         );
@@ -349,7 +356,7 @@ public:
 
     basic_bz2_ostreambase(
         ostream_reference ostream_,
-        size_t block_size_100k_ ,
+        int block_size_100k_ ,
         size_t verbosity_ ,
         size_t work_factor_,
         size_t buffer_size_
@@ -388,7 +395,7 @@ public:
 
     basic_bz2_ostream(
         ostream_reference ostream_,
-        size_t block_size_100k_ = 9,
+        int block_size_100k_ = 9,
         size_t verbosity_ = 0,
         size_t work_factor_ = 30,
         size_t buffer_size_ = BZ2_OUTPUT_DEFAULT_BUFFER_SIZE

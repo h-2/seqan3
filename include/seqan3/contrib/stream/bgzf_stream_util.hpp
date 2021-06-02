@@ -67,8 +67,9 @@ template <>
 struct CompressionContext<detail::gz_compression>
 {
     z_stream strm;
+    int compression_level;
 
-    CompressionContext()
+    CompressionContext(int _compression_level = Z_DEFAULT_COMPRESSION) : compression_level{_compression_level}
     {
         std::memset(&strm, 0, sizeof(z_stream));
     }
@@ -78,6 +79,8 @@ template <>
 struct CompressionContext<detail::bgzf_compression>:
     CompressionContext<detail::gz_compression>
 {
+    using CompressionContext<detail::gz_compression>::CompressionContext;
+
     static constexpr size_t BLOCK_HEADER_LENGTH = detail::bgzf_compression::magic_header.size();
     unsigned char headerPos;
 };
@@ -115,10 +118,10 @@ compressInit(CompressionContext<detail::gz_compression> & ctx)
 
     // (weese:) We use Z_BEST_SPEED instead of Z_DEFAULT_COMPRESSION as it turned out
     //          to be 2x faster and produces only 7% bigger output
-//    int status = deflateInit2(&ctx.strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
-//                              GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
-    int status = deflateInit2(&ctx.strm, Z_BEST_SPEED, Z_DEFLATED,
-                              GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+   int status = deflateInit2(&ctx.strm, ctx.compression_level, Z_DEFLATED,
+                             GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+//     int status = deflateInit2(&ctx.strm, Z_BEST_SPEED, Z_DEFLATED,
+//                               GZIP_WINDOW_BITS, Z_DEFAULT_MEM_LEVEL, Z_DEFAULT_STRATEGY);
     if (status != Z_OK)
         throw io_error("Calling deflateInit2() failed for gz file.");
 }

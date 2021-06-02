@@ -49,6 +49,11 @@ private:
     typedef byte_type*                                   byte_buffer_type;
     typedef ConcurrentQueue<size_t, Suspendable<Limit> > job_queue_type;
 
+    int sanitize_compression_level(int level_) const
+    {
+        return (level_ < 0 || level_ > 9) ? Z_DEFAULT_COMPRESSION : level_;
+    }
+
 public:
 
     typedef Tr                                traits_type;
@@ -156,8 +161,9 @@ public:
     std::vector<std::thread>  pool;
 
     basic_bgzf_ostreambuf(ostream_reference ostream_,
-                         size_t numThreads = bgzf_thread_count,
-                         size_t jobsPerThread = 8) :
+                          size_t numThreads = bgzf_thread_count,
+                          size_t jobsPerThread = 8,
+                          int compression_level = Z_DEFAULT_COMPRESSION) :
         numThreads(numThreads),
         numJobs(numThreads * jobsPerThread),
         jobQueue(numJobs),
@@ -180,8 +186,9 @@ public:
         }
 
         // Start off threads.
+        int lvl = sanitize_compression_level(compression_level);
         for (size_t i = 0; i < numThreads; ++i)
-            pool.emplace_back(CompressionThread{this, CompressionContext<detail::bgzf_compression>{}});
+            pool.emplace_back(CompressionThread{this, CompressionContext<detail::bgzf_compression>{lvl}});
 
         currentJobAvail = popFront(currentJobId, idleQueue);
         assert(currentJobAvail);
@@ -286,6 +293,8 @@ public:
 
     // returns a reference to the output stream
     ostream_reference get_ostream() const    { return serializer.worker.ostream; };
+
+
 };
 
 // --------------------------------------------------------------------------
@@ -305,8 +314,11 @@ public:
     typedef std::basic_ostream<Elem, Tr>&                         ostream_reference;
     typedef basic_bgzf_ostreambuf<Elem, Tr, ElemA, ByteT, ByteAT> bgzf_streambuf_type;
 
-    basic_bgzf_ostreambase(ostream_reference ostream_)
-        : m_buf(ostream_)
+    basic_bgzf_ostreambase(ostream_reference ostream_,
+                           size_t numThreads = bgzf_thread_count,
+                           size_t jobsPerThread = 8,
+                           int compression_level = Z_DEFAULT_COMPRESSION)
+        : m_buf(ostream_, numThreads, jobsPerThread, compression_level)
     {
         this->init(&m_buf );
     };
@@ -346,8 +358,11 @@ public:
     typedef std::basic_ostream<Elem,Tr>                        ostream_type;
     typedef ostream_type&                                      ostream_reference;
 
-    basic_bgzf_ostream(ostream_reference ostream_) :
-        bgzf_ostreambase_type(ostream_),
+    basic_bgzf_ostream(ostream_reference ostream_,
+                       size_t numThreads = bgzf_thread_count,
+                       size_t jobsPerThread = 8,
+                       int compression_level = Z_DEFAULT_COMPRESSION) :
+        bgzf_ostreambase_type(ostream_, numThreads, jobsPerThread, compression_level),
         ostream_type(bgzf_ostreambase_type::rdbuf())
     {}
 

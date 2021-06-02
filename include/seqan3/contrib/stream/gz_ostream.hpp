@@ -79,7 +79,7 @@ public:
     // Construct a zip stream
     // More info on the following parameters can be found in the zlib documentation.
     basic_gz_ostreambuf(ostream_reference ostream_,
-                        size_t level_,
+                        int level_,
                         EStrategy strategy_,
                         size_t window_size_,
                         size_t memory_level_,
@@ -111,6 +111,11 @@ private:
     int m_err;
     byte_vector_type m_output_buffer;
     char_vector_type m_buffer;
+
+    int sanitize_compression_level(int level_) const
+    {
+        return (level_ < 0 || level_ > 9) ? Z_DEFAULT_COMPRESSION : level_;
+    }
 };
 
 // --------------------------------------------------------------------------
@@ -124,7 +129,7 @@ template <typename Elem,
           typename ByteAT>
 basic_gz_ostreambuf<Elem, Tr, ElemA, ByteT, ByteAT>::basic_gz_ostreambuf(
     ostream_reference ostream_,
-    size_t level_,
+    int level_,
     EStrategy strategy_,
     size_t window_size_,
     size_t memory_level_,
@@ -144,7 +149,7 @@ basic_gz_ostreambuf<Elem, Tr, ElemA, ByteT, ByteAT>::basic_gz_ostreambuf(
 
     m_err = deflateInit2(
         &m_zip_stream,
-        std::min(9, static_cast<int>(level_)),
+        sanitize_compression_level(level_),
         Z_DEFLATED,
         static_cast<int>(window_size_),
         std::min(9, static_cast<int>(memory_level_)),
@@ -349,7 +354,7 @@ public:
     // Construct a zip stream
     // More info on the following parameters can be found in the zlib documentation.
     basic_gz_ostreambase(ostream_reference ostream_,
-                          size_t level_,
+                          int level_,
                           EStrategy strategy_,
                           size_t window_size_,
                           size_t memory_level_,
@@ -413,7 +418,7 @@ public:
     // buffer_size_ the buffer size used to zip data
 
     basic_gz_ostream(ostream_reference ostream_,
-                      size_t level_ = Z_DEFAULT_COMPRESSION,
+                      int level_ = Z_DEFAULT_COMPRESSION,
                       EStrategy strategy_ = DefaultStrategy,
                       size_t window_size_ = 31, // 15 (size) + 16 (gzip header)
                       size_t memory_level_ = 8,

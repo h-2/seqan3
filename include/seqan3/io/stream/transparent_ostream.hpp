@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------------------------------
 
 /*!\file
- * \brief Provides seqan3::transparent_istream.
+ * \brief Provides seqan3::transparent_ostream.
  * \author Hannes Hauswedell <hannes.hauswedell AT decode.is>
  */
 
@@ -17,7 +17,6 @@
 #include <iostream>
 #include <thread>
 
-#include <seqan3/core/platform.hpp>
 #include <seqan3/io/stream/compression.hpp>
 #include <seqan3/io/detail/misc_input.hpp>
 #include <seqan3/std/filesystem>
@@ -26,8 +25,8 @@
 namespace seqan3
 {
 
-//!\brief Options that can be provided to seqan3::transparent_istream.
-struct transparent_istream_options
+//!\brief Options that can be provided to seqan3::transparent_ostream.
+struct transparent_ostream_options
 {
     //!\brief Size of the buffer used when opening a file from a filename.
     size_t buffer1_size = 1024 * 1024;
@@ -43,6 +42,15 @@ struct transparent_istream_options
      * GZ-decompressor, but it is simpler to just set threads to 1.
      */
     compression_format compression = compression_format::detect;
+
+    /*!\brief The compression level to use by the algorithm.
+     *
+     * \details
+     *
+     * The default value is -1 which maps to the default value of the respective algorithm (6 for GZ/BGZF and 9 for
+     * BZip2). ZLIB macros and numeric values between 0 and 9 are supported.
+     */
+    int compression_level = -1;
 
     /*!\brief Maximum number of threads to use for decompression.
      *
@@ -61,11 +69,11 @@ struct transparent_istream_options
     size_t threads = std::max<size_t>(1, std::min<size_t>(4, std::thread::hardware_concurrency()));
 };
 
-/*!\brief A std::istream that automatically detects compressed streams and transparently decompresses them.
+/*!\brief A std::ostream that automatically detects compressed streams and transparently decompresses them.
  * \tparam char_t The character type of the stream.
  */
-template <typename char_t>
-class transparent_istream : public std::basic_istream<char_t>
+template <typename char_t = char>
+class transparent_ostream : public std::basic_ostream<char_t>
 {
 private:
     /*TODO
@@ -75,7 +83,7 @@ private:
      */
 
     //!\brief The options.
-    transparent_istream_options options_;
+    transparent_ostream_options options_;
     //!\brief The stream buffer.
     std::vector<char>           stream1_buffer;
     std::vector<char>           stream2_buffer;
@@ -84,18 +92,20 @@ private:
     //!\brief Filename after possible compression extensions have been removed.
     std::filesystem::path       truncated_filename_;
 
+
     //!\brief The type of the internal stream pointers. Allows dynamically setting ownership management.
-    using stream_ptr_t = std::unique_ptr<std::basic_istream<char_t>,
-                                         std::function<void(std::basic_istream<char_t>*)>>;
+    using stream_ptr_t = std::unique_ptr<std::basic_ostream<char_t>,
+                                         std::function<void(std::basic_ostream<char_t>*)>>;
     //!\brief Stream deleter that does nothing (no ownership assumed).
-    static void stream_deleter_noop(std::basic_istream<char_t> *) {}
+    static void stream_deleter_noop(std::basic_ostream<char_t> *) {}
     //!\brief Stream deleter with default behaviour (ownership assumed).
-    static void stream_deleter_default(std::basic_istream<char_t> * ptr) { delete ptr; }
+    static void stream_deleter_default(std::basic_ostream<char_t> * ptr) { delete ptr; }
 
     //!\brief The primary stream is the user provided stream or the file stream if constructed from filename.
     stream_ptr_t primary_stream{nullptr, stream_deleter_noop};
     //!\brief The secondary stream is a compression layer on the primary or just points to the primary (no compression).
     stream_ptr_t secondary_stream{nullptr, stream_deleter_noop};
+
 
     //!\brief This function reads the magic bytes from the stream and adds a decompression layer if necessary.
     void set_secondary_stream()
@@ -103,47 +113,47 @@ private:
         assert(primary_stream->good());
 
         /* detect compression format */
-        std::string magic_header = detail::read_magic_header(*primary_stream);
-        compression_format selected_compression{};
-
         if (options_.compression == compression_format::detect)
         {
-            selected_compression = detail::detect_format_from_magic_header(magic_header);
-        }
-        else
-        {
-            selected_compression = options_.compression;
-            if (!detail::header_matches_dyn(selected_compression, magic_header))
-                throw file_open_error{"The file has a different compression format than the one selected."};
+            if (filename_.empty())
+            {
+                throw file_open_error{"Cannot auto-detect compression type from arbitrary streams."
+                                      "Please select \"none\" or a specific compression format."};
+            }
+            options_.compression = detail::detect_format_from_filename(filename_);
         }
 
         // Thread handling
-        if (selected_compression == compression_format::bgzf)
+        if (options_.compression == compression_format::bgzf)
         {
+            //TODO this is problematic, need to change for output
             if (options_.threads == 1)
-                selected_compression = compression_format::gz;
+                options_.compression = compression_format::gz;
             else
                 --options_.threads; // bgzf spawns **additional** threads, but user sets total
         }
 
         std::span<std::string> file_extensions{};
-        std::istream * sec = nullptr;
-        switch (selected_compression)
+        std::ostream * sec = nullptr;
+        switch (options_.compression)
         {
             case compression_format::bgzf:
-                sec = detail::make_istream<compression_format::bgzf>(*primary_stream, options_.threads);
+                sec = detail::make_ostream<compression_format::bgzf>(*primary_stream,
+                                                                     options_.threads,
+                                                                     8,
+                                                                     options_.compression_level);
                 file_extensions = compression_traits<compression_format::bgzf>::file_extensions;
                 break;
             case compression_format::gz:
-                sec = detail::make_istream<compression_format::gz>(*primary_stream);
+                sec = detail::make_ostream<compression_format::gz>(*primary_stream, options_.compression_level);
                 file_extensions = compression_traits<compression_format::gz>::file_extensions;
                 break;
             case compression_format::bz2:
-                sec = detail::make_istream<compression_format::bz2>(*primary_stream);
+                sec = detail::make_ostream<compression_format::bz2>(*primary_stream, options_.compression_level);
                 file_extensions = compression_traits<compression_format::bz2>::file_extensions;
                 break;
             case compression_format::zstd:
-                sec = detail::make_istream<compression_format::zstd>(*primary_stream);
+                sec = detail::make_ostream<compression_format::zstd>(*primary_stream, options_.compression_level);
                 file_extensions = compression_traits<compression_format::zstd>::file_extensions;
                 break;
             default:
@@ -155,7 +165,7 @@ private:
         else
             secondary_stream = stream_ptr_t{sec, stream_deleter_default};
 
-        // truncate the filename in truncated_filename_ to show that decompression has taken place
+        // truncate the filename in truncated_filename_ to show that compression has taken place
         if (filename_.has_extension())
         {
             std::string extension = filename_.extension().string().substr(1);
@@ -170,6 +180,7 @@ private:
 
         // possibly add intermediate compression stream
         set_secondary_stream();
+        assert(secondary_stream != nullptr);
 
         // make this behave like the secondary stream
         this->rdbuf(secondary_stream->rdbuf());
@@ -180,27 +191,32 @@ public:
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    transparent_istream()                                           = delete;   //!< Defaulted.
-    transparent_istream(transparent_istream const &)                = delete;   //!< Defaulted.
-    transparent_istream(transparent_istream &&)                     = default;  //!< Defaulted.
-    transparent_istream & operator=(transparent_istream const &)    = delete;   //!< Defaulted.
-    transparent_istream & operator=(transparent_istream &&)         = default;  //!< Defaulted.
+    transparent_ostream()                                           = delete;   //!< Defaulted.
+    transparent_ostream(transparent_ostream const &)                = delete;   //!< Defaulted.
+    transparent_ostream(transparent_ostream &&)                     = default;  //!< Defaulted.
+    transparent_ostream & operator=(transparent_ostream const &)    = delete;   //!< Defaulted.
+    transparent_ostream & operator=(transparent_ostream &&)         = default;  //!< Defaulted.
 
     /*!\brief Construct from a filename.
      * \param[in] filename  The filename to open.
-     * \param[in] options   See seqan3::transparent_istream_options.
+     * \param[in] options   See seqan3::transparent_ostream_options.
+     *
+     * \details
+     *
+     * The compression format is auto-detected from the filename by default. It can manually be selected via the
+     * options.
      */
-    explicit transparent_istream(std::filesystem::path filename,
-                                 transparent_istream_options options = transparent_istream_options{}) :
-        primary_stream{new std::ifstream{}, stream_deleter_default},
+    explicit transparent_ostream(std::filesystem::path filename,
+                                 transparent_ostream_options options = transparent_ostream_options{}) :
+        primary_stream{new std::ofstream{}, stream_deleter_default},
         options_{std::move(options)},
         filename_{std::move(filename)}
     {
         stream1_buffer.resize(options.buffer1_size);
 
         primary_stream->rdbuf()->pubsetbuf(stream1_buffer.data(), stream1_buffer.size());
-        static_cast<std::basic_ifstream<char> *>(primary_stream.get())->open(filename_,
-                                                                             std::ios_base::in | std::ios::binary);
+        static_cast<std::basic_ofstream<char> *>(primary_stream.get())->open(filename_,
+                                                                             std::ios_base::out | std::ios::binary);
 
         if (!primary_stream->good())
             throw file_open_error{"Could not open file " + filename_.string() + " for reading."};
@@ -209,11 +225,15 @@ public:
     }
 
     /*!\brief Construct from a stream.
-     * \param[in] stream    The stream to wrap.
-     * \param[in] options   See seqan3::transparent_istream_options.
+     * \param[in] stream  The stream to wrap.
+     * \param[in] options See seqan3::transparent_ostream_options.
+     *
+     * \details
+     *
+     * The compression format is "none" by default. It can manually be selected via the options.
      */
-    explicit transparent_istream(std::istream & stream,
-                                 transparent_istream_options options = transparent_istream_options{}) :
+    explicit transparent_ostream(std::ostream & stream,
+                                 transparent_ostream_options options = transparent_ostream_options{.compression = compression_format::none}) :
         primary_stream{&stream, stream_deleter_noop},
         options_{std::move(options)}
     {
@@ -221,21 +241,13 @@ public:
     }
 
     //!\overload
-    explicit transparent_istream(std::istream && stream,
-                                 transparent_istream_options options = transparent_istream_options{}) :
-        primary_stream{new std::istream{std::move(stream)}, stream_deleter_default},
+    explicit transparent_ostream(std::ostream && stream,
+                                 transparent_ostream_options options = transparent_ostream_options{.compression = compression_format::none}) :
+        primary_stream{new std::ostream{std::move(stream)}, stream_deleter_default},
         options_{std::move(options)}
     {
         init();
     }
-
-    //!\brief Flush both streams in order on destruction.
-    ~transparent_istream()
-    {
-        primary_stream->sync();
-        secondary_stream->sync();
-    }
-    //!\}
 
     //!\brief The filename this object was created from; empty if this object was not created from a file.
     std::filesystem::path const & filename()

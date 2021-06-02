@@ -27,6 +27,7 @@
     #include <seqan3/contrib/stream/gz_istream.hpp>
     #include <seqan3/contrib/stream/gz_ostream.hpp>
 #endif
+#include <seqan3/std/filesystem>
 
 namespace seqan3
 {
@@ -303,14 +304,14 @@ inline std::string read_magic_header(std::istream & istr)
 }
 
 //-------------------------------------------------------------------------------
-// detect_format_from_stream
+// detect_format_from_magic_header
 //-------------------------------------------------------------------------------
 
 /*!\brief Deduce seqan3::compression_format from a magic header string.
  *
  * \details
  *
- * Note that this function checks BGZF before GZ, since the latter's magic header is a prefix of the former.
+ * Note that this function checks BGZF before GZ, since the latter's magic header is a prefix of the former's.
  */
 inline compression_format detect_format_from_magic_header(std::string_view magic_header)
 {
@@ -327,6 +328,46 @@ inline compression_format detect_format_from_magic_header(std::string_view magic
 }
 
 //-------------------------------------------------------------------------------
+// detect_format_from_filename
+//-------------------------------------------------------------------------------
+
+/*!\brief Deduce seqan3::compression_format from a filename extension.
+ *
+ * \details
+ *
+ * Note that this function checks BGZF before GZ which means that it always selects BGZF for the extension ".gz".
+ * This is desired, because many biological formats expect this.
+ */
+inline compression_format detect_format_from_filename(std::filesystem::path const & path)
+{
+    auto ext = path.extension().string();
+
+    if (!ext.starts_with('.'))
+        return compression_format::none;
+    else
+        ext = ext.substr(1);
+
+    for (std::string_view ext2 : compression_traits<compression_format::bgzf>::file_extensions)
+        if (ext == ext2)
+            return compression_format::bgzf;
+    for (std::string_view ext2 : compression_traits<compression_format::gz>::file_extensions)
+        if (ext == ext2)
+            return compression_format::gz;
+    for (std::string_view ext2 : compression_traits<compression_format::bz2>::file_extensions)
+        if (ext == ext2)
+            return compression_format::bz2;
+    for (std::string_view ext2 : compression_traits<compression_format::zstd>::file_extensions)
+        if (ext == ext2)
+            return compression_format::zstd;
+    for (std::string_view ext2 : compression_traits<compression_format::bgzf>::file_extensions)
+        if (ext == ext2)
+            return compression_format::bgzf;
+
+    return compression_format::none;
+}
+
+
+//-------------------------------------------------------------------------------
 // make_istream
 //-------------------------------------------------------------------------------
 
@@ -341,6 +382,25 @@ std::istream * make_istream(args_t && ... args)
     {
         throw file_open_error{std::string{"The file is "} + std::string{compression_traits<format>::as_string} +
                               "-compressed, but SeqAn3 is built without support for this format."};
+        return nullptr;
+    }
+}
+
+//-------------------------------------------------------------------------------
+// make_ostream
+//-------------------------------------------------------------------------------
+
+template <compression_format format, typename ... args_t>
+std::ostream * make_ostream(args_t && ... args)
+{
+    if constexpr (compression_traits<format>::available)
+    {
+        return new typename compression_traits<format>::template basic_ostream<char>{std::forward<args_t>(args)...};
+    }
+    else
+    {
+        throw file_open_error{std::string{compression_traits<format>::as_string} + "-compression was selected, "
+                              "but SeqAn3 is built without support for this format."};
         return nullptr;
     }
 }
