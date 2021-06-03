@@ -180,11 +180,29 @@ public:
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    transparent_istream()                                           = delete;   //!< Defaulted.
+    transparent_istream() : std::basic_istream<char_t>{} {}
+
     transparent_istream(transparent_istream const &)                = delete;   //!< Defaulted.
-    transparent_istream(transparent_istream &&)                     = default;  //!< Defaulted.
-    transparent_istream & operator=(transparent_istream const &)    = delete;   //!< Defaulted.
     transparent_istream & operator=(transparent_istream &&)         = default;  //!< Defaulted.
+    transparent_istream & operator=(transparent_istream const &)    = delete;   //!< Defaulted.
+
+    transparent_istream(transparent_istream && rhs) : transparent_istream()
+
+//         : std::basic_istream<char_t>(std::move(rhs))
+    {
+        rhs.primary_stream->sync();
+        rhs.rdbuf(nullptr);
+        std::swap(options_,             rhs.options_);
+        std::swap(stream1_buffer,       rhs.stream1_buffer);
+        std::swap(stream2_buffer,       rhs.stream2_buffer);
+        std::swap(filename_,            rhs.filename_);
+        std::swap(truncated_filename_,  rhs.truncated_filename_);
+        std::swap(primary_stream,       rhs.primary_stream);
+        std::swap(secondary_stream,     rhs.secondary_stream);
+
+//         primary_stream->rdbuf()->pubsetbuf(stream1_buffer.data(), stream1_buffer.size());
+        this->rdbuf(primary_stream->rdbuf());
+    }
 
     /*!\brief Construct from a filename.
      * \param[in] filename  The filename to open.

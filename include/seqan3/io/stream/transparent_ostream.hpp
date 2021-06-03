@@ -30,16 +30,15 @@ struct transparent_ostream_options
 {
     //!\brief Size of the buffer used when opening a file from a filename.
     size_t buffer1_size = 1024 * 1024;
-    //!\brief Size of the buffer used for the decompression stream.
+    //!\brief Size of the buffer used for the compression stream.
     size_t buffer2_size = 1024 * 1024 * 4;
 
-    /*!\brief Which decompressor to use.
+    /*!\brief Which compressor to use.
      *
      * \details
      *
-     * In almost all cases, you will want to have this auto-detected. You can explicitly set this to
-     * seqan3::compression_format::gz when opening BGZF-compressed files to use the regular, single-threaded
-     * GZ-decompressor, but it is simpler to just set threads to 1.
+     * For ostream opened from filenames, the default is to detect the desired compression from the file's extension.
+     * But you can also specifiy a desired compression format manually.
      */
     compression_format compression = compression_format::detect;
 
@@ -48,25 +47,25 @@ struct transparent_ostream_options
      * \details
      *
      * The default value is -1 which maps to the default value of the respective algorithm (6 for GZ/BGZF and 9 for
-     * BZip2). ZLIB macros and numeric values between 0 and 9 are supported.
+     * BZip2). ZLIB macros and numeric values between -1 and 9 are supported.
      */
     int compression_level = -1;
 
-    /*!\brief Maximum number of threads to use for decompression.
+    /*!\brief Maximum number of threads to use for compression.
      *
      * \details
      *
      * This value is currently only relevant for BGZF compressed streams/files. Note that these threads refer to the
-     * total number of used threads, i.e. a value of 4 means that three extra threads are spawned. A value of 1 will
-     * result in the regular GZ decompressor being used.
+     * total number of used threads, i.e. a value of 4 means that three extra threads are spawned.
      *
-     * The default value for this is 4 or "available CPUs" if that is less than 4. The reason is that for the
-     * default compression levels of the GZip blocks, performance degrades with more than 4 threads. If you use files
-     * compressed with stronger settings, more threads might be useful.
+     * The default value for this "all available CPUs" as more threads typically improve performance (albeit not
+     * linearly).
      *
-     * **4 threads can provide up to 3.5x speed-up.**
+     * ### Attention
+     *
+     * A value of 1 is currently not supported by the BGZF implementation!
      */
-    size_t threads = std::max<size_t>(1, std::min<size_t>(4, std::thread::hardware_concurrency()));
+    size_t threads = std::thread::hardware_concurrency();
 };
 
 /*!\brief A std::ostream that automatically detects compressed streams and transparently decompresses them.
@@ -126,9 +125,9 @@ private:
         // Thread handling
         if (options_.compression == compression_format::bgzf)
         {
-            //TODO this is problematic, need to change for output
-            if (options_.threads == 1)
-                options_.compression = compression_format::gz;
+
+            if (options_.threads == 1) // TODO this needs a real resolution
+                throw file_open_error{"BGZF compression with only one thread is currently not supported."};
             else
                 --options_.threads; // bgzf spawns **additional** threads, but user sets total
         }
@@ -140,7 +139,7 @@ private:
             case compression_format::bgzf:
                 sec = detail::make_ostream<compression_format::bgzf>(*primary_stream,
                                                                      options_.threads,
-                                                                     8,
+                                                                     static_cast<size_t>(8ul),
                                                                      options_.compression_level);
                 file_extensions = compression_traits<compression_format::bgzf>::file_extensions;
                 break;

@@ -250,6 +250,12 @@ public:
         return *this;
     }
 
+    //!\brief no op.
+    fast_ostreambuf_iterator * operator->()
+    {
+        return this;
+    }
+
     //!\brief Writes a character to the associated output stream.
     fast_ostreambuf_iterator & operator=(char_t const c)
     {

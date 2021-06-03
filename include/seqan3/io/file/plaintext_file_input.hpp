@@ -16,39 +16,17 @@
 #include <string_view>
 #include <variant>
 
+#include <seqan3/io/file/plaintext_file_util.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/io/stream/transparent_istream.hpp>
-
-
-namespace seqan3
-{
-
-//!\brief The value type of seqan3::plaintext_file_input if every line is split into fields.
-struct plaintext_record
-{
-    //!\brief The entire line (exluding EOL characters but including delimiters).
-    std::string_view line;
-    //!\brief A range of the individual fields (without delimiters or EOL characters).
-    std::vector<std::string_view> fields;
-};
-
-
-enum class plaintext_record_kind
-{
-    line,
-    line_and_fields
-};
-
-} // namespace seqan3
 
 namespace seqan3::detail
 {
 
-
 template <typename char_t,
           typename traits_t = std::char_traits<char_t>,
           plaintext_record_kind record_kind = plaintext_record_kind::line>
-class plaintext_iterator
+class plaintext_input_iterator
 {
 private:
     //!\brief Down-cast pointer to the stream-buffer.
@@ -81,22 +59,22 @@ public:
     using reference         = std::conditional_t<record_kind == plaintext_record_kind::line,
                                                  std::string_view,
                                                  plaintext_record const &>;
-    using pointer           = void;                     //!< Has no pointer type.
+    using pointer           = value_type const *;       //!< Has no pointer type.
     using iterator_category = std::input_iterator_tag;  //!< Pure input iterator.
     //!\}
 
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    plaintext_iterator()                                        noexcept = default; //!< Defaulted.
-    plaintext_iterator(plaintext_iterator const &)              noexcept = default; //!< Defaulted.
-    plaintext_iterator(plaintext_iterator &&)                   noexcept = default; //!< Defaulted.
-    plaintext_iterator & operator=(plaintext_iterator const &)  noexcept = default; //!< Defaulted.
-    plaintext_iterator & operator=(plaintext_iterator &&)       noexcept = default; //!< Defaulted.
-    ~plaintext_iterator()                                       noexcept = default; //!< Defaulted.
+    plaintext_input_iterator()                                        noexcept = default; //!< Defaulted.
+    plaintext_input_iterator(plaintext_input_iterator const &)              noexcept = default; //!< Defaulted.
+    plaintext_input_iterator(plaintext_input_iterator &&)                   noexcept = default; //!< Defaulted.
+    plaintext_input_iterator & operator=(plaintext_input_iterator const &)  noexcept = default; //!< Defaulted.
+    plaintext_input_iterator & operator=(plaintext_input_iterator &&)       noexcept = default; //!< Defaulted.
+    ~plaintext_input_iterator()                                       noexcept = default; //!< Defaulted.
 
     //!\brief Construct from a stream buffer.
-    explicit plaintext_iterator(std::basic_streambuf<char_t, traits_t> & ibuf, bool const init = true) :
+    explicit plaintext_input_iterator(std::basic_streambuf<char_t, traits_t> & ibuf, bool const init = true) :
         stream_buf{reinterpret_cast<stream_buffer_exposer<char_t, traits_t> *>(&ibuf)}
     {
         if (init) // read first record
@@ -112,22 +90,22 @@ public:
         }
     }
 
-    plaintext_iterator(std::basic_streambuf<char_t, traits_t> & ibuf, char_t const sep, bool const init = true)
+    plaintext_input_iterator(std::basic_streambuf<char_t, traits_t> & ibuf, char_t const sep, bool const init = true)
         requires (record_kind == plaintext_record_kind::line_and_fields)
-        : plaintext_iterator{ibuf, init}
+        : plaintext_input_iterator{ibuf, init}
     {
         field_sep = sep;
     }
 
     //!\brief Construct from a stream.
-    explicit plaintext_iterator(std::basic_istream<char_t, traits_t> & istr, bool const init = true) :
-        plaintext_iterator{*istr.rdbuf(), init}
+    explicit plaintext_input_iterator(std::basic_istream<char_t, traits_t> & istr, bool const init = true) :
+        plaintext_input_iterator{*istr.rdbuf(), init}
     {}
 
 
-    plaintext_iterator(std::basic_istream<char_t, traits_t> & istr, char_t const sep, bool const init = true)
+    plaintext_input_iterator(std::basic_istream<char_t, traits_t> & istr, char_t const sep, bool const init = true)
         requires (record_kind == plaintext_record_kind::line_and_fields)
-        : plaintext_iterator{*istr.rdbuf(), sep, init}
+        : plaintext_input_iterator{*istr.rdbuf(), sep, init}
     {}
 
     //!\}
@@ -136,7 +114,7 @@ public:
      * \{
      */
     //!\brief Advance by one and rebuffer if necessary (vtable lookup iff rebuffering).
-    plaintext_iterator & operator++()
+    plaintext_input_iterator & operator++()
     {
         assert(stream_buf != nullptr);
 
@@ -247,12 +225,17 @@ public:
     //!\}
 
     //!\brief Read current value from buffer (no vtable lookup, safe even at end).
-    reference operator*()
+    reference operator*() const
     {
         if constexpr (record_kind == plaintext_record_kind::line_and_fields)
             return record;
         else
             return record.line;
+    }
+
+    pointer operator->() const
+    {
+        return &**this;
     }
 
     //!\brief Show the character behind the current record.
@@ -272,25 +255,25 @@ public:
      * \{
      */
     //!\brief True if the read buffer is not empty; involves no vtable lookup.
-    friend bool operator==(plaintext_iterator const & lhs, std::default_sentinel_t const &) noexcept
+    friend bool operator==(plaintext_input_iterator const & lhs, std::default_sentinel_t const &) noexcept
     {
         return lhs.at_end;
     }
 
     //!\brief True if the read buffer is empty; involves no vtable lookup.
-    friend bool operator!=(plaintext_iterator const & lhs, std::default_sentinel_t const &) noexcept
+    friend bool operator!=(plaintext_input_iterator const & lhs, std::default_sentinel_t const &) noexcept
     {
         return !(lhs == std::default_sentinel);
     }
 
     //!\brief True if the read buffer is not empty; involves no vtable lookup.
-    friend bool operator==(std::default_sentinel_t const &, plaintext_iterator const & rhs) noexcept
+    friend bool operator==(std::default_sentinel_t const &, plaintext_input_iterator const & rhs) noexcept
     {
         return rhs == std::default_sentinel;
     }
 
     //!\brief True if the read buffer is empty; involves no vtable lookup.
-    friend bool operator!=(std::default_sentinel_t const &, plaintext_iterator const & rhs) noexcept
+    friend bool operator!=(std::default_sentinel_t const &, plaintext_input_iterator const & rhs) noexcept
     {
         return !(rhs == std::default_sentinel);
     }
@@ -304,61 +287,6 @@ public:
 namespace seqan3
 {
 
-/*!\brief A helper for specifying the header of a
- * \tparam record_kind Whether to split lines on delimiter (e.g. TSV files) or not.
- */
-class plaintext_file_header
-{
-private:
-    //!\brief The state of the variable, encoded as the value of the char or the special values -200 and -300.
-    int state = -200;
-
-public:
-    //!\brief The state representing "no header".
-    static constexpr struct {} none{};
-    //!\brief The state representing "first line is header".
-    static constexpr struct {} first_line{};
-
-    //!\brief Type of the state representing "all lines that start with character X".
-    struct starts_with
-    {
-        //!\privatesection
-        char c;
-    };
-
-    /*!\name Constructors, destructor and assignment
-     * \{
-     */
-    constexpr plaintext_file_header()                                           noexcept = default;
-    constexpr plaintext_file_header(plaintext_file_header const & )             noexcept = default;
-    constexpr plaintext_file_header(plaintext_file_header && )                  noexcept = default;
-    constexpr plaintext_file_header & operator=(plaintext_file_header const & ) noexcept = default;
-    constexpr plaintext_file_header & operator=(plaintext_file_header && )      noexcept = default;
-
-    constexpr plaintext_file_header(decltype(none))         noexcept : state{-200} {}
-    constexpr plaintext_file_header(decltype(first_line))   noexcept : state{-300} {}
-    constexpr plaintext_file_header(starts_with s)          noexcept : state{s.c}  {}
-    //!\}
-
-    /*!\name Functions for retrieving the state.
-     * \{
-     */
-    constexpr bool is_none()        const noexcept { return state == -200; }
-    constexpr bool is_first_line()  const noexcept { return state == -300; }
-    constexpr bool is_starts_with() const noexcept { return state != -200 && state != -300; }
-
-    char get_starts_with() const
-    {
-        if (!is_starts_with())
-        {
-            throw std::logic_error{"Tried to read starts_with from plaintext_file_header but it was in a "
-                                   "different state."};
-        }
-
-        return static_cast<char>(state);
-    }
-    //!\}
-};
 
 /*!\brief Line-wise reader of plaintext files; supports transparent decompression.
  * \tparam record_kind Whether to split lines on delimiter (e.g. TSV files) or not.
@@ -395,7 +323,7 @@ public:
      * \{
      */
     //!\brief The iterator type of this view (an input iterator).
-    using iterator          = detail::plaintext_iterator<char, std::char_traits<char>, record_kind>;
+    using iterator          = detail::plaintext_input_iterator<char, std::char_traits<char>, record_kind>;
     //!\brief The const iterator type is void, because files are not const-iterable.
     using const_iterator    = void;
     //!\brief The type returned by end().
@@ -420,7 +348,7 @@ public:
 
     /*!\brief Construct from filename.
      * \param[in] filename        Path to the file you wish to open.
-     * \param[in] field_separator Delimiter between rows in a line. [optional]
+     * \param[in] field_separator Delimiter between fields in a line. [optional]
      * \param[in] header          Whether to treat certain lines as header; see seqan3::plaintext_file_header. [optional]
      * \param[in] istream_options Options passed to the underlying stream; see seqan3::transparent_istream_options. [optional]
      * \throws seqan3::file_open_error If the file could not be opened, e.g. non-existant or non-readable.
@@ -457,7 +385,7 @@ public:
 
     /*!\brief Construct from an existing stream and with specified format.
      * \param[in] str             The stream to open from.
-     * \param[in] field_separator Delimiter between rows in a line. [optional]
+     * \param[in] field_separator Delimiter between fields in a line. [optional]
      * \param[in] header          Whether to treat certain lines as header; see seqan3::plaintext_file_header. [optional]
      * \param[in] istream_options Options passed to the underlying stream; see seqan3::transparent_istream_options. [optional]
      * \throws seqan3::file_open_error If the file could not be opened, e.g. non-existant or non-readable.
@@ -629,16 +557,40 @@ protected:
     std::string headr;
 };
 
-plaintext_file_input(std::filesystem::path const &,
+template <typename t>
+plaintext_file_input(t &&,
                      char const,
                      plaintext_file_header header = plaintext_file_header::none,
                      transparent_istream_options const & istream_options = transparent_istream_options{})
 -> plaintext_file_input<plaintext_record_kind::line_and_fields>;
 
-plaintext_file_input(std::filesystem::path const &,
+template <typename t>
+plaintext_file_input(t &&,
                      plaintext_file_header header = plaintext_file_header::none,
                      transparent_istream_options const & istream_options = transparent_istream_options{})
 -> plaintext_file_input<plaintext_record_kind::line>;
+
+// plaintext_file_input(std::istream &,
+//                      char const,
+//                      plaintext_file_header header = plaintext_file_header::none,
+//                      transparent_istream_options const & istream_options = transparent_istream_options{})
+// -> plaintext_file_input<plaintext_record_kind::line_and_fields>;
+//
+// plaintext_file_input(std::istream &,
+//                      plaintext_file_header header = plaintext_file_header::none,
+//                      transparent_istream_options const & istream_options = transparent_istream_options{})
+// -> plaintext_file_input<plaintext_record_kind::line>;
+//
+// plaintext_file_input(std::istream &&,
+//                      char const,
+//                      plaintext_file_header header = plaintext_file_header::none,
+//                      transparent_istream_options const & istream_options = transparent_istream_options{})
+// -> plaintext_file_input<plaintext_record_kind::line_and_fields>;
+//
+// plaintext_file_input(std::istream &&,
+//                      plaintext_file_header header = plaintext_file_header::none,
+//                      transparent_istream_options const & istream_options = transparent_istream_options{})
+// -> plaintext_file_input<plaintext_record_kind::line>;
 
 
 } // namespace seqan3

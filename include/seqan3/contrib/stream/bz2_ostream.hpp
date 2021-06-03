@@ -102,9 +102,9 @@ private:
     byte_vector_type m_output_buffer;
     char_vector_type m_buffer;
 
-    void sanitize_compression_level(int block_size_100k_)
+    int sanitize_compression_level(int block_size_100k_)
     {
-        block_size_100k_ = (block_size_100k_ < 0 || block_size_100k_ > 9) ? 9 : block_size_100k_;
+        return (block_size_100k_ < 0 || block_size_100k_ > 9) ? 9 : block_size_100k_;
     }
 };
 
@@ -141,11 +141,9 @@ basic_bz2_ostreambuf<
     m_bzip2_stream.avail_out=0;
     m_bzip2_stream.next_out=NULL;
 
-    sanitize_compression_level(block_size_100k_);
-
     m_err=BZ2_bzCompressInit(
         &m_bzip2_stream,
-        block_size_100k_,
+        sanitize_compression_level(block_size_100k_),
         std::min( 4, static_cast<int>(verbosity_) ),
         std::min( 250, static_cast<int>(work_factor_) )
         );
