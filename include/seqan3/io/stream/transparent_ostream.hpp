@@ -190,12 +190,26 @@ public:
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    transparent_ostream()                                           = delete;   //!< Defaulted.
+    //!\brief Manually defined default constructor that behaves as expected.
+    transparent_ostream() : std::basic_ostream<char_t>{} {}
     transparent_ostream(transparent_ostream const &)                = delete;   //!< Defaulted.
-    transparent_ostream(transparent_ostream &&)                     = default;  //!< Defaulted.
     transparent_ostream & operator=(transparent_ostream const &)    = delete;   //!< Defaulted.
+    //TODO double check that this works:
     transparent_ostream & operator=(transparent_ostream &&)         = default;  //!< Defaulted.
 
+    //!\brief Manually defined move constructor that behaves as expected.
+    transparent_ostream(transparent_ostream && rhs)
+    {
+        std::swap(options_,             rhs.options_);
+        std::swap(stream1_buffer,       rhs.stream1_buffer);
+        std::swap(stream2_buffer,       rhs.stream2_buffer);
+        std::swap(filename_,            rhs.filename_);
+        std::swap(truncated_filename_,  rhs.truncated_filename_);
+        std::swap(primary_stream,       rhs.primary_stream);
+        std::swap(secondary_stream,     rhs.secondary_stream);
+
+        this->set_rdbuf(secondary_stream->rdbuf());
+    }
     /*!\brief Construct from a filename.
      * \param[in] filename  The filename to open.
      * \param[in] options   See seqan3::transparent_ostream_options.
@@ -204,6 +218,8 @@ public:
      *
      * The compression format is auto-detected from the filename by default. It can manually be selected via the
      * options.
+     *
+     * The stream is opened in binary mode and provided with a buffer the size of options.buffer1_size.
      */
     explicit transparent_ostream(std::filesystem::path filename,
                                  transparent_ostream_options options = transparent_ostream_options{}) :
@@ -230,6 +246,8 @@ public:
      * \details
      *
      * The compression format is "none" by default. It can manually be selected via the options.
+     *
+     *
      */
     explicit transparent_ostream(std::ostream & stream,
                                  transparent_ostream_options options = transparent_ostream_options{.compression = compression_format::none}) :
