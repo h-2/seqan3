@@ -114,6 +114,28 @@ auto reverse(type_list<head_t, pack_t...>)
     return concat(reverse(type_list<pack_t...>{}), type_list<head_t>{});
 }
 
+/*!\brief Implementation for seqan3::list_traits::replace_at.
+ * \tparam replace_t The type replacing the old one.
+ * \tparam idx The index of the type to replace.
+ * \tparam pack_t Types in the type list to be modified.
+ * \ingroup type_list
+ */
+template <typename replace_t,
+          ptrdiff_t idx,
+          typename ...pack_t>
+pack_traits::replace_at<replace_t, idx, pack_t...> replace_at(type_list<pack_t...>);
+
+
+template <size_t count, typename t>
+auto repeat()
+{
+    if constexpr (count == 1)
+        return type_list<t>{};
+    else
+        return concat(type_list<t>{}, repeat<count - 1, t>());
+}
+
+
 } // namespace seqan3::list_traits::detail
 
 // ----------------------------------------------------------------------------
@@ -464,6 +486,23 @@ template <typename replace_t, std::ptrdiff_t i, typename list_t>
 //!\endcond
 using replace_at = decltype(detail::replace_at<replace_t, i>(list_t{}));
 
+
+/*!\brief Return a type list with a single type repeated n times.
+ * \tparam count     The target size of the type list.
+ * \tparam type      The (input) type.
+ * \ingroup type_list
+ *
+ * \details
+ *
+ * ### (Compile-time) Complexity
+ *
+ * * Number of template instantiations: O(n)
+ * * Other operations: O(n)
+ *
+ * \include test/snippet/utility/type_list/list_traits_replace_at.cpp
+ */
+template <size_t count, typename type>
+using repeat = decltype(detail::repeat<count, type>());
 //!\}
 
 } // namespace seqan3::list_traits

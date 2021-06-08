@@ -12,29 +12,32 @@
 #include <seqan3/std/ranges>
 #include <sstream>
 
-#include <seqan3/alphabet/quality/phred42.hpp>
+#include <seqan3/alphabet/nucleotide/sam_dna16.hpp>
+#include <seqan3/alphabet/quality/phred63.hpp>
 #include <seqan3/core/detail/debug_stream_alphabet.hpp>
-#include <seqan3/io/sam_file/input.hpp>
+#include <seqan3/io/file/am_file_input.hpp>
 #include <seqan3/test/expect_range_eq.hpp>
 #include <seqan3/test/tmp_filename.hpp>
 #include <seqan3/utility/views/convert.hpp>
 
-using seqan3::operator""_dna4;
-using seqan3::operator""_dna5;
-using seqan3::operator""_phred42;
+using namespace seqan3::literals;
 
-using default_fields = seqan3::fields<seqan3::field::seq, seqan3::field::id, seqan3::field::qual>;
-
-TEST(sam_file_input_iterator, concepts)
+constexpr auto field_ids = seqan3::tag<seqan3::field::seq,
+                                       seqan3::field::id,
+                                       seqan3::field::qual>;
+constexpr auto field_types = seqan3::type_tag<std::vector<seqan3::sam_dna16>,
+                                              std::string,
+                                              std::vector<seqan3::phred63>>;
+TEST(am_io_reader_input_iterator, concepts)
 {
-    using it_t = typename seqan3::sam_file_input<>::iterator;
-    using sen_t = typename seqan3::sam_file_input<>::sentinel;
+    using it_t = typename seqan3::am_io::reader<>::iterator;
+    using sen_t = typename seqan3::am_io::reader<>::sentinel;
 
     EXPECT_TRUE((std::input_iterator<it_t>));
     EXPECT_TRUE((std::sentinel_for<sen_t, it_t>));
 }
 
-struct sam_file_input_f : public ::testing::Test
+struct am_io_reader_input_f : public ::testing::Test
 {
     std::string input =
 R"(@HD	VN:1.6	SO:unknown	GO:none
@@ -46,11 +49,11 @@ read2	42	ref	2	62	7M1D1M1S	ref	10	300	AGGCTGNAG	!##$&'()*	xy:B:S,3,4,5
 read3	43	ref	3	63	1S1M1D4M1D1M1S	ref	10	300	GGAGTATA	!!*+,-./
 )";
 
-    std::vector<seqan3::dna5_vector> seq_comp
+    std::vector<std::vector<seqan3::sam_dna16>> seq_comp
     {
-        "ACGT"_dna5,
-        "AGGCTGNAG"_dna5,
-        "GGAGTATA"_dna5
+        "ACGT"_sam_dna16,
+        "AGGCTGNAG"_sam_dna16,
+        "GGAGTATA"_sam_dna16
     };
 
     std::vector<std::string> id_comp
@@ -60,95 +63,84 @@ read3	43	ref	3	63	1S1M1D4M1D1M1S	ref	10	300	GGAGTATA	!!*+,-./
         "read3"
     };
 
-    std::vector<std::vector<seqan3::phred42>> qual_comp
+    std::vector<std::vector<seqan3::phred63>> qual_comp
     {
-        { "!##$"_phred42 },
-        { "!##$&'()*"_phred42 },
-        { "!!*+,-./"_phred42 },
+        { "!##$"_phred63 },
+        { "!##$&'()*"_phred63 },
+        { "!!*+,-./"_phred63 },
     };
 };
 
-TEST_F(sam_file_input_f, concepts)
+TEST_F(am_io_reader_input_f, concepts)
 {
-    using t = seqan3::sam_file_input<>;
+    using t = seqan3::am_io::reader<>;
     EXPECT_TRUE((std::ranges::input_range<t>));
 
-    using ct = seqan3::sam_file_input<> const;
+    using ct = seqan3::am_io::reader<> const;
     // not const-iterable
     EXPECT_FALSE((std::ranges::input_range<ct>));
 }
 
-TEST_F(sam_file_input_f, construct_by_filename)
+TEST_F(am_io_reader_input_f, construct_by_filename)
 {
     /* just the filename */
     {
-        seqan3::test::tmp_filename filename{"sam_file_input_constructor.sam"};
+        seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.sam"};
 
         {
             std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
         }
 
-        EXPECT_NO_THROW(seqan3::sam_file_input<>{filename.get_path()} );
+        EXPECT_NO_THROW(seqan3::am_io::reader<>{filename.get_path()} );
     }
 
     // correct format check is done by tests of that format
 
     /* wrong extension */
     {
-        seqan3::test::tmp_filename filename{"sam_file_input_constructor.xyz"};
+        seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.xyz"};
         std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
-        EXPECT_THROW(seqan3::sam_file_input<>{filename.get_path()},
+        EXPECT_THROW(seqan3::am_io::reader<>{filename.get_path()},
                      seqan3::unhandled_extension_error );
     }
 
     /* non-existent file*/
     {
-        EXPECT_THROW(seqan3::sam_file_input<>{"/dev/nonexistent/foobarOOO"}, seqan3::file_open_error);
+        EXPECT_THROW(seqan3::am_io::reader<>{"/dev/nonexistent/foobarOOO"}, seqan3::file_open_error);
     }
     /* non-existent file with reference information*/
-    {
-        std::vector<std::string> ref_ids{"ref1", "ref2"};
-        std::vector<seqan3::dna4_vector> ref_seqs{"ACTG"_dna4, "ACTG"_dna4};
-        EXPECT_THROW((seqan3::sam_file_input{"/dev/nonexistent/foobarOOO", ref_ids, ref_seqs}),
-                     seqan3::file_open_error);
-    }
+//     {
+//         std::vector<std::string> ref_ids{"ref1", "ref2"};
+//         std::vector<seqan3::dna4_vector> ref_seqs{"ACTG"_dna4, "ACTG"_dna4};
+//         EXPECT_THROW((seqan3::am_io::reader{"/dev/nonexistent/foobarOOO", ref_ids, ref_seqs}),
+//                      seqan3::file_open_error);
+//     }
 
     /* filename + fields */
     {
-        seqan3::test::tmp_filename filename{"sam_file_input_constructor.sam"};
+        seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.sam"};
 
         {
             std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
         }
 
-        using fields_seq = seqan3::fields<seqan3::field::seq>;
-
-        EXPECT_NO_THROW(( seqan3::sam_file_input<seqan3::sam_file_input_default_traits<>,
-                                                 fields_seq,
-                                                 seqan3::type_list<seqan3::format_sam>>{filename.get_path(),
-                                                                                              fields_seq{}} ));
+        EXPECT_NO_THROW(( seqan3::am_io::reader{filename.get_path(), seqan3::am_io::reader_options{ .field_ids = field_ids, .field_types = field_types } } ));
     }
 }
 
-TEST_F(sam_file_input_f, construct_from_stream)
+TEST_F(am_io_reader_input_f, construct_from_stream)
 {
     /* stream + format_tag */
-    EXPECT_NO_THROW(( seqan3::sam_file_input<seqan3::sam_file_input_default_traits<>,
-                                             default_fields,
-                                             seqan3::type_list<seqan3::format_sam>>{std::istringstream{input},
-                                                                                          seqan3::format_sam{}} ));
+    EXPECT_NO_THROW(( seqan3::am_io::reader{std::istringstream{input}, seqan3::format_sam{}} ));
 
     /* stream + format_tag + fields */
-    EXPECT_NO_THROW(( seqan3::sam_file_input<seqan3::sam_file_input_default_traits<>,
-                                             default_fields,
-                                             seqan3::type_list<seqan3::format_sam>>{std::istringstream{input},
-                                                                                          seqan3::format_sam{},
-                                                                                          default_fields{}} ));
+    EXPECT_NO_THROW(( seqan3::am_io::reader{std::istringstream{input}, seqan3::format_sam{}, seqan3::am_io::reader_options{ .field_ids = field_ids, .field_types = field_types } } ));
 }
 
-TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
+#if 0
+TEST_F(am_io_reader_input_f, default_template_args_and_deduction_guides)
 {
-    using comp0 = seqan3::sam_file_input_default_traits<>;
+    using comp0 = seqan3::am_io::reader_default_traits<>;
     using comp1 = seqan3::fields<seqan3::field::seq,
                                  seqan3::field::id,
                                  seqan3::field::offset,
@@ -170,7 +162,7 @@ TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
 
     /* default template args */
     {
-        using t = seqan3::sam_file_input<>;
+        using t = seqan3::am_io::reader<>;
         EXPECT_TRUE((std::is_same_v<typename t::traits_type,        comp0>));
         EXPECT_TRUE((std::is_same_v<typename t::selected_field_ids, comp1>));
         EXPECT_TRUE((std::is_same_v<typename t::valid_formats,      comp2>));
@@ -179,13 +171,13 @@ TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
 
     /* guided filename constructor */
     {
-        seqan3::test::tmp_filename filename{"sam_file_input_constructor.sam"};
+        seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.sam"};
 
         {
             std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
         }
 
-        seqan3::sam_file_input fin{filename.get_path()};
+        seqan3::am_io::reader fin{filename.get_path()};
 
         using t = decltype(fin);
         EXPECT_TRUE((std::is_same_v<typename t::traits_type,        comp0>));
@@ -196,13 +188,13 @@ TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
 
     /* guided filename constructor + custom fields */
     {
-        seqan3::test::tmp_filename filename{"sam_file_input_constructor.sam"};
+        seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.sam"};
 
         {
             std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
         }
 
-        seqan3::sam_file_input fin{filename.get_path(), seqan3::fields<seqan3::field::seq>{}};
+        seqan3::am_io::reader fin{filename.get_path(), seqan3::fields<seqan3::field::seq>{}};
 
         using t = decltype(fin);
         EXPECT_TRUE((std::is_same_v<typename t::traits_type,        comp0>));
@@ -214,7 +206,7 @@ TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
     /* guided stream constructor */
     {
         std::istringstream ext{input};
-        seqan3::sam_file_input fin{ext, seqan3::format_sam{}};
+        seqan3::am_io::reader fin{ext, seqan3::format_sam{}};
 
         using t = decltype(fin);
         EXPECT_TRUE((std::is_same_v<typename t::traits_type,        comp0>));
@@ -225,7 +217,7 @@ TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
 
     /* guided stream temporary constructor */
     {
-        seqan3::sam_file_input fin{std::istringstream{input}, seqan3::format_sam{}};
+        seqan3::am_io::reader fin{std::istringstream{input}, seqan3::format_sam{}};
 
         using t = decltype(fin);
         EXPECT_TRUE((std::is_same_v<typename t::traits_type,        comp0>));
@@ -235,27 +227,27 @@ TEST_F(sam_file_input_f, default_template_args_and_deduction_guides)
     }
 }
 
-TEST_F(sam_file_input_f, empty_file)
+TEST_F(am_io_reader_input_f, empty_file)
 {
     seqan3::test::tmp_filename filename{"empty.sam"};
     std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
 
-    seqan3::sam_file_input fin{filename.get_path()};
+    seqan3::am_io::reader fin{filename.get_path()};
 
     EXPECT_EQ(fin.begin(), fin.end());
 }
 
-TEST_F(sam_file_input_f, empty_stream)
+TEST_F(am_io_reader_input_f, empty_stream)
 {
-    seqan3::sam_file_input fin{std::istringstream{std::string{}}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{std::string{}}, seqan3::format_sam{}};
 
     EXPECT_EQ(fin.begin(), fin.end());
 }
 
-TEST_F(sam_file_input_f, record_reading)
+TEST_F(am_io_reader_input_f, record_reading)
 {
     /* record based reading */
-    seqan3::sam_file_input fin{std::istringstream{input}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{input}, seqan3::format_sam{}};
 
     size_t counter = 0;
     for (auto & rec : fin)
@@ -277,10 +269,10 @@ TEST_F(sam_file_input_f, record_reading)
     EXPECT_EQ(counter, 3u);
 }
 
-TEST_F(sam_file_input_f, record_reading_custom_fields)
+TEST_F(am_io_reader_input_f, record_reading_custom_fields)
 {
     /* record based reading */
-    seqan3::sam_file_input fin{std::istringstream{input},
+    seqan3::am_io::reader fin{std::istringstream{input},
                                seqan3::format_sam{},
                                seqan3::fields<seqan3::field::id, seqan3::field::seq>{}};
 
@@ -296,9 +288,9 @@ TEST_F(sam_file_input_f, record_reading_custom_fields)
     EXPECT_EQ(counter, 3u);
 }
 
-TEST_F(sam_file_input_f, file_view)
+TEST_F(am_io_reader_input_f, file_view)
 {
-    seqan3::sam_file_input fin{std::istringstream{input}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{input}, seqan3::format_sam{}};
 
 #if !SEQAN3_WORKAROUND_GCC_93983
     auto minimum_length_filter = std::views::filter([] (auto const & rec)
@@ -378,9 +370,9 @@ std::string input_gz
     '\xD3','\xC3','\x00','\x00','\x00'
 };
 
-TEST_F(sam_file_input_f, decompression_by_filename_gz)
+TEST_F(am_io_reader_input_f, decompression_by_filename_gz)
 {
-    seqan3::test::tmp_filename filename{"sam_file_output_test.sam.gz"};
+    seqan3::test::tmp_filename filename{"am_io_reader_output_test.sam.gz"};
 
     {
         std::ofstream of{filename.get_path(), std::ios::binary};
@@ -388,19 +380,19 @@ TEST_F(sam_file_input_f, decompression_by_filename_gz)
         std::copy(input_gz.begin(), input_gz.end(), std::ostreambuf_iterator<char>{of});
     }
 
-    seqan3::sam_file_input fin{filename.get_path()};
+    seqan3::am_io::reader fin{filename.get_path()};
 
     decompression_impl(*this, fin);
 }
 
-TEST_F(sam_file_input_f, decompression_by_stream_gz)
+TEST_F(am_io_reader_input_f, decompression_by_stream_gz)
 {
-    seqan3::sam_file_input fin{std::istringstream{input_gz}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{input_gz}, seqan3::format_sam{}};
 
     decompression_impl(*this, fin);
 }
 
-TEST_F(sam_file_input_f, read_empty_gz_file)
+TEST_F(am_io_reader_input_f, read_empty_gz_file)
 {
     std::string empty_zipped_file
     {
@@ -408,7 +400,7 @@ TEST_F(sam_file_input_f, read_empty_gz_file)
         '\x00', '\x03', '\x66', '\x6f', '\x6f', '\x00', '\x03', '\x00',
         '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'
     };
-    seqan3::sam_file_input fin{std::istringstream{empty_zipped_file}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{empty_zipped_file}, seqan3::format_sam{}};
 
     EXPECT_TRUE(fin.begin() == fin.end());
 }
@@ -437,9 +429,9 @@ std::string input_bgzf
     '\x00', '\x00', '\x00', '\x00', '\x00'
 };
 
-TEST_F(sam_file_input_f, decompression_by_filename_bgzf)
+TEST_F(am_io_reader_input_f, decompression_by_filename_bgzf)
 {
-    seqan3::test::tmp_filename filename{"sam_file_output_test.sam.bgzf"};
+    seqan3::test::tmp_filename filename{"am_io_reader_output_test.sam.bgzf"};
 
     {
         std::ofstream of{filename.get_path(), std::ios::binary};
@@ -447,19 +439,19 @@ TEST_F(sam_file_input_f, decompression_by_filename_bgzf)
         std::copy(input_bgzf.begin(), input_bgzf.end(), std::ostreambuf_iterator<char>{of});
     }
 
-    seqan3::sam_file_input fin{filename.get_path()};
+    seqan3::am_io::reader fin{filename.get_path()};
 
     decompression_impl(*this, fin);
 }
 
-TEST_F(sam_file_input_f, decompression_by_stream_bgzf)
+TEST_F(am_io_reader_input_f, decompression_by_stream_bgzf)
 {
-    seqan3::sam_file_input fin{std::istringstream{input_bgzf}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{input_bgzf}, seqan3::format_sam{}};
 
     decompression_impl(*this, fin);
 }
 
-TEST_F(sam_file_input_f, read_empty_bgzf_file)
+TEST_F(am_io_reader_input_f, read_empty_bgzf_file)
 {
     std::string empty_bgzf_file
     {
@@ -467,7 +459,7 @@ TEST_F(sam_file_input_f, read_empty_bgzf_file)
         '\x06', '\x00', '\x42', '\x43', '\x02', '\x00', '\x1B', '\x00', '\x03', '\x00',
         '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00'
     };
-    seqan3::sam_file_input fin{std::istringstream{empty_bgzf_file}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{empty_bgzf_file}, seqan3::format_sam{}};
 
     EXPECT_TRUE(fin.begin() == fin.end());
 }
@@ -490,9 +482,9 @@ std::string input_bz2
     '\x92','\x29','\xC2','\x84','\x83','\xDF','\x17','\x0C','\x90'
 };
 
-TEST_F(sam_file_input_f, decompression_by_filename_bz2)
+TEST_F(am_io_reader_input_f, decompression_by_filename_bz2)
 {
-    seqan3::test::tmp_filename filename{"sam_file_output_test.sam.bz2"};
+    seqan3::test::tmp_filename filename{"am_io_reader_output_test.sam.bz2"};
 
     {
         std::ofstream of{filename.get_path(), std::ios::binary};
@@ -500,25 +492,25 @@ TEST_F(sam_file_input_f, decompression_by_filename_bz2)
         std::copy(input_bz2.begin(), input_bz2.end(), std::ostreambuf_iterator<char>{of});
     }
 
-    seqan3::sam_file_input fin{filename.get_path()};
+    seqan3::am_io::reader fin{filename.get_path()};
 
     decompression_impl(*this, fin);
 }
 
-TEST_F(sam_file_input_f, decompression_by_stream_bz2)
+TEST_F(am_io_reader_input_f, decompression_by_stream_bz2)
 {
-    seqan3::sam_file_input fin{std::istringstream{input_bz2}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{input_bz2}, seqan3::format_sam{}};
 
     decompression_impl(*this, fin);
 }
 
-TEST_F(sam_file_input_f, read_empty_bz2_file)
+TEST_F(am_io_reader_input_f, read_empty_bz2_file)
 {
     std::string empty_zipped_file
     {
         '\x42', '\x5a', '\x68', '\x39', '\x17', '\x72', '\x45', '\x38', '\x50', '\x90', '\x00', '\x00', '\x00', '\x00'
     };
-    seqan3::sam_file_input fin{std::istringstream{empty_zipped_file}, seqan3::format_sam{}};
+    seqan3::am_io::reader fin{std::istringstream{empty_zipped_file}, seqan3::format_sam{}};
 
     EXPECT_TRUE(fin.begin() == fin.end());
 }
@@ -528,7 +520,7 @@ TEST_F(sam_file_input_f, read_empty_bz2_file)
 // SAM format specificities
 // ----------------------------------------------------------------------------
 
-struct sam_file_input_sam_format_f : public sam_file_input_f
+struct am_io_reader_input_sam_format_f : public am_io_reader_input_f
 {
     std::vector<seqan3::dna4_vector> const ref_seqs = {"ACTGATCGAGAGGATCTAGAGGAGATCGTAGGAC"_dna4};
     std::vector<std::string> const ref_ids = {"ref"};
@@ -551,15 +543,15 @@ struct sam_file_input_sam_format_f : public sam_file_input_f
     };
 };
 
-TEST_F(sam_file_input_sam_format_f, construct_by_filename_and_read_alignments)
+TEST_F(am_io_reader_input_sam_format_f, construct_by_filename_and_read_alignments)
 {
-    seqan3::test::tmp_filename filename{"sam_file_input_constructor.sam"};
+    seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.sam"};
     {
         std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
         filecreator << input;
     }
 
-    seqan3::sam_file_input fin{filename.get_path(), ref_ids, ref_seqs, seqan3::fields<seqan3::field::alignment>{}};
+    seqan3::am_io::reader fin{filename.get_path(), ref_ids, ref_seqs, seqan3::fields<seqan3::field::alignment>{}};
 
     EXPECT_EQ(fin.header().ref_ids(), ref_ids);
 
@@ -575,9 +567,9 @@ TEST_F(sam_file_input_sam_format_f, construct_by_filename_and_read_alignments)
     EXPECT_EQ(counter, 3u);
 }
 
-TEST_F(sam_file_input_sam_format_f, construct_from_stream_and_read_alignments)
+TEST_F(am_io_reader_input_sam_format_f, construct_from_stream_and_read_alignments)
 {
-    seqan3::sam_file_input fin{std::istringstream{input},
+    seqan3::am_io::reader fin{std::istringstream{input},
                                ref_ids,
                                ref_seqs,
                                seqan3::format_sam{},
@@ -597,9 +589,9 @@ TEST_F(sam_file_input_sam_format_f, construct_from_stream_and_read_alignments)
     EXPECT_EQ(counter, 3u);
 }
 
-TEST_F(sam_file_input_sam_format_f, construct_from_stream_and_read_alignment_with_dummy)
+TEST_F(am_io_reader_input_sam_format_f, construct_from_stream_and_read_alignment_with_dummy)
 {
-    seqan3::sam_file_input fin{std::istringstream{input},
+    seqan3::am_io::reader fin{std::istringstream{input},
                                seqan3::format_sam{},
                                seqan3::fields<seqan3::field::alignment>{}};
 
@@ -618,9 +610,9 @@ TEST_F(sam_file_input_sam_format_f, construct_from_stream_and_read_alignment_wit
 // BAM format specificities
 // ----------------------------------------------------------------------------
 
-struct sam_file_input_bam_format_f : public sam_file_input_sam_format_f
+struct am_io_reader_input_bam_format_f : public am_io_reader_input_sam_format_f
 {
-    std::string binary_input{ // corresponds to 'input' from sam_file_input_f fixture
+    std::string binary_input{ // corresponds to 'input' from am_io_reader_input_f fixture
         '\x1F', '\x8B', '\x08', '\x04', '\x00', '\x00', '\x00', '\x00', '\x00', '\xFF', '\x06', '\x00', '\x42',
         '\x43', '\x02', '\x00', '\x8D', '\x00', '\x73', '\x72', '\xF4', '\x65', '\x4C', '\x66', '\x60', '\x60',
         '\x70', '\xF0', '\x70', '\xE1', '\x0C', '\xF3', '\xB3', '\x32', '\xD4', '\x33', '\xE3', '\x0C', '\xF6',
@@ -651,15 +643,15 @@ struct sam_file_input_bam_format_f : public sam_file_input_sam_format_f
 };
 
 #if SEQAN3_HAS_ZLIB
-TEST_F(sam_file_input_bam_format_f, construct_by_filename)
+TEST_F(am_io_reader_input_bam_format_f, construct_by_filename)
 {
-    seqan3::test::tmp_filename filename{"sam_file_input_constructor.bam"};
+    seqan3::test::tmp_filename filename{"am_io_reader_input_constructor.bam"};
     {
         std::ofstream filecreator{filename.get_path(), std::ios::out | std::ios::binary};
         filecreator << binary_input;
     }
 
-    seqan3::sam_file_input fin{filename.get_path(), ref_ids, ref_seqs, seqan3::fields<seqan3::field::id,
+    seqan3::am_io::reader fin{filename.get_path(), ref_ids, ref_seqs, seqan3::fields<seqan3::field::id,
                                                                                       seqan3::field::seq,
                                                                                       seqan3::field::qual,
                                                                                       seqan3::field::alignment>{}};
@@ -683,11 +675,11 @@ TEST_F(sam_file_input_bam_format_f, construct_by_filename)
     EXPECT_EQ(counter, 3u);
 }
 
-TEST_F(sam_file_input_bam_format_f, construct_by_stream)
+TEST_F(am_io_reader_input_bam_format_f, construct_by_stream)
 {
     std::istringstream stream{binary_input};
 
-    seqan3::sam_file_input fin{stream,
+    seqan3::am_io::reader fin{stream,
                                ref_ids,
                                ref_seqs,
                                seqan3::format_bam{},
@@ -715,3 +707,5 @@ TEST_F(sam_file_input_bam_format_f, construct_by_stream)
     EXPECT_EQ(counter, 3u);
 }
 #endif // SEQAN3_HAS_ZLIB
+
+#endif

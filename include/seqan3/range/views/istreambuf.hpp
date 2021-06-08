@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include <seqan3/io/detail/istreambuf_view.hpp>
+#include <seqan3/io/stream/istreambuf_view.hpp>
 
 SEQAN3_DEPRECATED_HEADER(
   "This header is deprecated and will be removed along all its content in SeqAn-3.1.0.")

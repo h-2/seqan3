@@ -22,23 +22,6 @@
 #include <seqan3/std/filesystem>
 #include <seqan3/std/iterator>
 
-namespace seqan3
-{
-
-template <auto val>
-struct tag_t
-{
-    using type = decltype(val);
-    static constexpr type value = val;
-};
-
-template <auto val>
-inline constexpr tag_t<val> tag;
-
-
-} // namespace seqan3
-
-
 namespace seqan3::detail
 {
 
@@ -57,7 +40,7 @@ void sized_range_copy(in_t && in, out_t && out)
     out.resize(std::ranges::size(in));
     std::ranges::copy(in, std::ranges::begin(out));
 }
-
+/*
 template <field field_id, field ... field_ids, typename types, typename or_type>
 auto get_or(record<types, fields<field_ids...>> const & rec, or_type && or_val)
 {
@@ -65,7 +48,7 @@ auto get_or(record<types, fields<field_ids...>> const & rec, or_type && or_val)
         return get<field_id>(rec);
     else
         return or_val;
-}
+}*/
 
 //TODO this needs other qualified overloads
 

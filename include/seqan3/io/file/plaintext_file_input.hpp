@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------------------------------
 
 /*!\file
- * \brief Provides seqan3::plaintext_file_input.
+ * \brief Provides seqan3::reader.
  * \author Hannes Hauswedell <hannes.hauswedell AT decode.is>
  */
 
@@ -20,17 +20,17 @@
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/io/stream/transparent_istream.hpp>
 
-namespace seqan3::detail
+namespace seqan3::plain_io::detail
 {
 
 template <typename char_t,
           typename traits_t = std::char_traits<char_t>,
-          plaintext_record_kind record_kind = plaintext_record_kind::line>
+          record_kind record_kind_ = record_kind::line>
 class plaintext_input_iterator
 {
 private:
     //!\brief Down-cast pointer to the stream-buffer.
-    stream_buffer_exposer<char_t, traits_t> * stream_buf = nullptr;
+    seqan3::detail::stream_buffer_exposer<char_t, traits_t> * stream_buf = nullptr;
 
     //!\brief Place to store lines that overlap buffer boundaries.
     std::basic_string<char_t, traits_t> overflow_buffer;
@@ -38,7 +38,7 @@ private:
     std::vector<size_t>                 field_end_positions;
 
     //!\brief The record.
-    plaintext_record record;
+    record record_;
 
     //!\brief Whether iterator is at end.
     bool   at_end    = false;
@@ -53,12 +53,12 @@ public:
      */
     using difference_type   = ptrdiff_t;                //!< Defaults to ptrdiff_t.
     //!\brief The record type.
-    using value_type        = std::conditional_t<record_kind == plaintext_record_kind::line,
+    using value_type        = std::conditional_t<record_kind_ == record_kind::line,
                                                  std::string_view,
-                                                 plaintext_record>;
-    using reference         = std::conditional_t<record_kind == plaintext_record_kind::line,
+                                                 record>;
+    using reference         = std::conditional_t<record_kind_ == record_kind::line,
                                                  std::string_view,
-                                                 plaintext_record const &>;
+                                                 record const &>;
     using pointer           = value_type const *;       //!< Has no pointer type.
     using iterator_category = std::input_iterator_tag;  //!< Pure input iterator.
     //!\}
@@ -75,7 +75,7 @@ public:
 
     //!\brief Construct from a stream buffer.
     explicit plaintext_input_iterator(std::basic_streambuf<char_t, traits_t> & ibuf, bool const init = true) :
-        stream_buf{reinterpret_cast<stream_buffer_exposer<char_t, traits_t> *>(&ibuf)}
+        stream_buf{reinterpret_cast<seqan3::detail::stream_buffer_exposer<char_t, traits_t> *>(&ibuf)}
     {
         if (init) // read first record
         {
@@ -91,7 +91,7 @@ public:
     }
 
     plaintext_input_iterator(std::basic_streambuf<char_t, traits_t> & ibuf, char_t const sep, bool const init = true)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : plaintext_input_iterator{ibuf, init}
     {
         field_sep = sep;
@@ -104,7 +104,7 @@ public:
 
 
     plaintext_input_iterator(std::basic_istream<char_t, traits_t> & istr, char_t const sep, bool const init = true)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : plaintext_input_iterator{*istr.rdbuf(), sep, init}
     {}
 
@@ -132,7 +132,7 @@ public:
         }
 
         overflow_buffer.clear();
-        if constexpr (record_kind == plaintext_record_kind::line_and_fields)
+        if constexpr (record_kind_ == record_kind::line_and_fields)
             field_end_positions.clear();
 
         bool rec_end_found  = false;
@@ -153,7 +153,7 @@ public:
                 }
                 else
                 {
-                    if constexpr (record_kind == plaintext_record_kind::line_and_fields)
+                    if constexpr (record_kind_ == record_kind::line_and_fields)
                         if (stream_buf->gptr()[count] == field_sep)
                             field_end_positions.push_back(old_count + count);
                 }
@@ -192,23 +192,23 @@ public:
         stream_buf->gbump(count + 1);
 
         /* create the record */
-        record.line = std::string_view{data_begin, end_of_record};
-        if constexpr (record_kind == plaintext_record_kind::line_and_fields)
+        record_.line = std::string_view{data_begin, end_of_record};
+        if constexpr (record_kind_ == record_kind::line_and_fields)
         {
             // add last end position
             field_end_positions.push_back(end_of_record);
 
-            record.fields.clear();
+            record_.fields.clear();
             for (size_t i = 0; i < field_end_positions.size(); ++i)
             {
                 if (i == 0)
                 {
-                    record.fields.emplace_back(data_begin,               // ptr
+                    record_.fields.emplace_back(data_begin,               // ptr
                                                field_end_positions[0]);  // size
                 }
                 else
                 {
-                    record.fields.emplace_back(data_begin + field_end_positions[i - 1] + 1,                 // ptr
+                    record_.fields.emplace_back(data_begin + field_end_positions[i - 1] + 1,                 // ptr
                                                field_end_positions[i] -  field_end_positions[i - 1] - 1);   // size
                 }
             }
@@ -227,10 +227,10 @@ public:
     //!\brief Read current value from buffer (no vtable lookup, safe even at end).
     reference operator*() const
     {
-        if constexpr (record_kind == plaintext_record_kind::line_and_fields)
-            return record;
+        if constexpr (record_kind_ == record_kind::line_and_fields)
+            return record_;
         else
-            return record.line;
+            return record_.line;
     }
 
     pointer operator->() const
@@ -284,12 +284,12 @@ public:
 
 
 
-namespace seqan3
+namespace seqan3::plain_io
 {
 
 
 /*!\brief Line-wise reader of plaintext files; supports transparent decompression.
- * \tparam record_kind Whether to split lines on delimiter (e.g. TSV files) or not.
+ * \tparam record_kind_ Whether to split lines on delimiter (e.g. TSV files) or not.
  *
  * \details
  *
@@ -314,8 +314,8 @@ namespace seqan3
  * long lines (or is in-fact binary), performance will degrade severely! Line-lengths up 10.000 or even 100.000 might
  * work, but files with e.g. full chromosomes or genomes in a single line are not supported.
  */
-template <plaintext_record_kind record_kind>
-class plaintext_file_input
+template <record_kind record_kind_>
+class reader
 {
 public:
     /*!\name Range associated types
@@ -323,7 +323,7 @@ public:
      * \{
      */
     //!\brief The iterator type of this view (an input iterator).
-    using iterator          = detail::plaintext_input_iterator<char, std::char_traits<char>, record_kind>;
+    using iterator          = detail::plaintext_input_iterator<char, std::char_traits<char>, record_kind_>;
     //!\brief The const iterator type is void, because files are not const-iterable.
     using const_iterator    = void;
     //!\brief The type returned by end().
@@ -334,22 +334,22 @@ public:
      * \{
      */
     //!\brief Default constructor is explicitly deleted, you need to give a stream or file name.
-    plaintext_file_input()                                              = delete;
+    reader()                                              = delete;
     //!\brief Copy construction is explicitly deleted, because you can't have multiple access to the same file.
-    plaintext_file_input(plaintext_file_input const &)                  = delete;
+    reader(reader const &)                  = delete;
     //!\brief Move construction is defaulted.
-    plaintext_file_input(plaintext_file_input &&)                       = default;
+    reader(reader &&)                       = default;
     //!\brief Copy assignment is explicitly deleted, because you can't have multiple access to the same file.
-    plaintext_file_input & operator=(plaintext_file_input const &)      = delete;
+    reader & operator=(reader const &)      = delete;
     //!\brief Move assignment is defaulted.
-    plaintext_file_input & operator=(plaintext_file_input &&)           = default;
+    reader & operator=(reader &&)           = default;
     //!\brief Destructor is defaulted.
-    ~plaintext_file_input()                                             = default;
+    ~reader()                                             = default;
 
     /*!\brief Construct from filename.
      * \param[in] filename        Path to the file you wish to open.
      * \param[in] field_separator Delimiter between fields in a line. [optional]
-     * \param[in] header          Whether to treat certain lines as header; see seqan3::plaintext_file_header. [optional]
+     * \param[in] header          Whether to treat certain lines as header; see seqan3::plain_io::header_kind. [optional]
      * \param[in] istream_options Options passed to the underlying stream; see seqan3::transparent_istream_options. [optional]
      * \throws seqan3::file_open_error If the file could not be opened, e.g. non-existant or non-readable.
      *
@@ -363,21 +363,21 @@ public:
      * the file is detected as being compressed.
      * See the section on \link io_compression compression and decompression \endlink for more information.
      */
-    explicit plaintext_file_input(std::filesystem::path const & filename,
-                                  char const field_separator,
-                                  plaintext_file_header header = plaintext_file_header::none,
-                                  transparent_istream_options const & istream_options = transparent_istream_options{})
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+    explicit reader(std::filesystem::path const & filename,
+                    char const field_separator,
+                    header_kind header = header_kind::none,
+                    transparent_istream_options const & istream_options = transparent_istream_options{})
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{filename, istream_options}, it{stream, field_separator}
     {
         read_header(header);
     }
 
     //!\overload
-    explicit plaintext_file_input(std::filesystem::path const & filename,
-                                  plaintext_file_header header = plaintext_file_header::none,
-                                  transparent_istream_options const & istream_options = transparent_istream_options{})
-        requires (record_kind == plaintext_record_kind::line)
+    explicit reader(std::filesystem::path const & filename,
+                    header_kind header = header_kind::none,
+                    transparent_istream_options const & istream_options = transparent_istream_options{})
+        requires (record_kind_ == record_kind::line)
         : stream{filename, istream_options}, it{stream}
     {
         read_header(header);
@@ -386,7 +386,7 @@ public:
     /*!\brief Construct from an existing stream and with specified format.
      * \param[in] str             The stream to open from.
      * \param[in] field_separator Delimiter between fields in a line. [optional]
-     * \param[in] header          Whether to treat certain lines as header; see seqan3::plaintext_file_header. [optional]
+     * \param[in] header          Whether to treat certain lines as header; see seqan3::plain_io::header_kind. [optional]
      * \param[in] istream_options Options passed to the underlying stream; see seqan3::transparent_istream_options. [optional]
      * \throws seqan3::file_open_error If the file could not be opened, e.g. non-existant or non-readable.
      *
@@ -400,42 +400,42 @@ public:
      * it is detected as being compressed.
      * See the section on \link io_compression compression and decompression \endlink for more information.
      */
-    explicit plaintext_file_input(std::istream & str,
-                                  char const field_separator,
-                                  plaintext_file_header header = plaintext_file_header::none,
-                                  transparent_istream_options const & istream_options = transparent_istream_options{})
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+    explicit reader(std::istream & str,
+                    char const field_separator,
+                    header_kind header = header_kind::none,
+                    transparent_istream_options const & istream_options = transparent_istream_options{})
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{str, istream_options}, it{stream, field_separator}
     {
         read_header(header);
     }
 
     //!\overload
-    explicit plaintext_file_input(std::istream & str,
-                                  plaintext_file_header header = plaintext_file_header::none,
-                                  transparent_istream_options const & istream_options = transparent_istream_options{})
-        requires (record_kind == plaintext_record_kind::line)
+    explicit reader(std::istream & str,
+                    header_kind header = header_kind::none,
+                    transparent_istream_options const & istream_options = transparent_istream_options{})
+        requires (record_kind_ == record_kind::line)
         : stream{str, istream_options}, it{stream}
     {
         read_header(header);
     }
 
     //!\overload
-    explicit plaintext_file_input(std::istream && str,
-                                  char const field_separator,
-                                  plaintext_file_header header = plaintext_file_header::none,
-                                  transparent_istream_options const & istream_options = transparent_istream_options{})
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+    explicit reader(std::istream && str,
+                    char const field_separator,
+                    header_kind header = header_kind::none,
+                    transparent_istream_options const & istream_options = transparent_istream_options{})
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{std::move(str), istream_options}, it{stream, field_separator}
     {
         read_header(header);
     }
 
     //!\overload
-    explicit plaintext_file_input(std::istream && str,
-                                  plaintext_file_header header = plaintext_file_header::none,
-                                  transparent_istream_options const & istream_options = transparent_istream_options{})
-        requires (record_kind == plaintext_record_kind::line)
+    explicit reader(std::istream && str,
+                    header_kind header = header_kind::none,
+                    transparent_istream_options const & istream_options = transparent_istream_options{})
+        requires (record_kind_ == record_kind::line)
         : stream{std::move(str), istream_options}, it{stream}
     {
         read_header(header);
@@ -485,7 +485,7 @@ public:
     }
 
     /*!\brief Return the record we are currently at in the file.
-     * \returns A std::string_view of the current line or a reference to seqan3::plaintext_record.
+     * \returns A std::string_view of the current line or a reference to seqan3::record.
      *
      * This function is identical to calling *begin().
      *
@@ -511,7 +511,7 @@ public:
 
 protected:
     //!\brief Process the header (if requested).
-    void read_header(plaintext_file_header _header)
+    void read_header(header_kind _header)
     {
         if (_header.is_none())
         {
@@ -539,10 +539,10 @@ protected:
         }
     }
 
-    //!\brief Return the current line (indepent of record_kind).
+    //!\brief Return the current line (indepent of record_kind_).
     std::string_view current_line()
     {
-        if constexpr (record_kind == plaintext_record_kind::line)
+        if constexpr (record_kind_ == record_kind::line)
             return *it;
         else
             return it->line;
@@ -558,39 +558,39 @@ protected:
 };
 
 template <typename t>
-plaintext_file_input(t &&,
+reader(t &&,
                      char const,
-                     plaintext_file_header header = plaintext_file_header::none,
+                     header_kind header = header_kind::none,
                      transparent_istream_options const & istream_options = transparent_istream_options{})
--> plaintext_file_input<plaintext_record_kind::line_and_fields>;
+-> reader<record_kind::line_and_fields>;
 
 template <typename t>
-plaintext_file_input(t &&,
-                     plaintext_file_header header = plaintext_file_header::none,
+reader(t &&,
+                     header_kind header = header_kind::none,
                      transparent_istream_options const & istream_options = transparent_istream_options{})
--> plaintext_file_input<plaintext_record_kind::line>;
+-> reader<record_kind::line>;
 
-// plaintext_file_input(std::istream &,
+// reader(std::istream &,
 //                      char const,
-//                      plaintext_file_header header = plaintext_file_header::none,
+//                      header_kind header = header_kind::none,
 //                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> plaintext_file_input<plaintext_record_kind::line_and_fields>;
+// -> reader<record_kind::line_and_fields>;
 //
-// plaintext_file_input(std::istream &,
-//                      plaintext_file_header header = plaintext_file_header::none,
+// reader(std::istream &,
+//                      header_kind header = header_kind::none,
 //                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> plaintext_file_input<plaintext_record_kind::line>;
+// -> reader<record_kind::line>;
 //
-// plaintext_file_input(std::istream &&,
+// reader(std::istream &&,
 //                      char const,
-//                      plaintext_file_header header = plaintext_file_header::none,
+//                      header_kind header = header_kind::none,
 //                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> plaintext_file_input<plaintext_record_kind::line_and_fields>;
+// -> reader<record_kind::line_and_fields>;
 //
-// plaintext_file_input(std::istream &&,
-//                      plaintext_file_header header = plaintext_file_header::none,
+// reader(std::istream &&,
+//                      header_kind header = header_kind::none,
 //                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> plaintext_file_input<plaintext_record_kind::line>;
+// -> reader<record_kind::line>;
 
 
 } // namespace seqan3

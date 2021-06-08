@@ -19,18 +19,10 @@
 #include <vector>
 
 #include <seqan3/core/range/type_traits.hpp>
-#include <seqan3/io/detail/ignore_output_iterator.hpp>
-#include <seqan3/io/detail/misc.hpp>
+#include <seqan3/io/file/am_io_util.hpp>
+#include <seqan3/io/file/plaintext_file_input.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
 #include <seqan3/io/stream/iterator.hpp>
-#include <seqan3/range/detail/misc.hpp>
-#include <seqan3/range/views/char_strictly_to.hpp>
-#include <seqan3/range/views/istreambuf.hpp>
-#include <seqan3/range/views/to_char.hpp>
-#include <seqan3/range/views/take_line.hpp>
-#include <seqan3/range/views/take_until.hpp>
-#include <seqan3/std/algorithm>
-#include <seqan3/std/ranges>
 #include <seqan3/utility/char_operations/predicate.hpp>
 
 namespace seqan3
@@ -47,81 +39,104 @@ private:
     friend base_t;
 
     /* RAW RECORD HANDLING*/
-    using format_fields = fields<field::qname,
-                                 field::flag,
-                                 field::rname,
-                                 field::pos,
-                                 field::mapq,
-                                 field::cigar,
-                                 field::rnext,
-                                 field::pnext,
-                                 field::tlen,
-                                 field::seq,
-                                 field::qual,
-                                 field::optionals,
-                                 field::header>;
-    using raw_record_type = seqan3::record<list_traits::repeat<format_fields::as_array.size(), std::string_view>,
+    using format_fields = tag_t<field::qname,
+                                field::flag,
+                                field::ref_id,
+                                field::pos,
+                                field::mapq,
+                                field::cigar,
+                                field::next_ref_id,
+                                field::next_pos,
+                                field::tlen,
+                                field::seq,
+                                field::qual,
+                                field::optionals,
+                                field::header>;
+    using raw_record_type = seqan3::record<list_traits::repeat<format_fields::size, std::string_view>,
                                            format_fields>;
 
     raw_record_type raw_record;
-    plain_file_iterator<char, std::char_traits<char>, true> file_it;
+    plain_io::detail::plaintext_input_iterator<char, std::char_traits<char>, plain_io::record_kind::line_and_fields> file_it;
     std::string raw_header;
+    am_io::header parsed_header;
 
     void read_raw_record()
     {
         ++file_it;
 
-        get<field::qname>(raw_record) = (*file_it).fields[0];
-        get<field::flag> (raw_record) = (*file_it).fields[1];
-        get<field::rname>(raw_record) = (*file_it).fields[2];
-        get<field::pos>  (raw_record) = (*file_it).fields[3];
-        get<field::mapq> (raw_record) = (*file_it).fields[4];
-        get<field::cigar>(raw_record) = (*file_it).fields[5];
-        get<field::rnext>(raw_record) = (*file_it).fields[6];
-        get<field::pnext>(raw_record) = (*file_it).fields[7];
-        get<field::tlen> (raw_record) = (*file_it).fields[8];
-        get<field::seq>  (raw_record) = (*file_it).fields[9];
-        get<field::qual> (raw_record) = (*file_it).fields[10];
+        if (file_it->fields.size() < 11)
+            throw format_error{"Encountered line with less than the 11 required columns."};
+
+        get<field::qname>      (raw_record) = (*file_it).fields[0];
+        get<field::flag>       (raw_record) = (*file_it).fields[1];
+        get<field::ref_id>     (raw_record) = (*file_it).fields[2];
+        get<field::pos>        (raw_record) = (*file_it).fields[3];
+        get<field::mapq>       (raw_record) = (*file_it).fields[4];
+        get<field::cigar>      (raw_record) = (*file_it).fields[5];
+        get<field::next_ref_id>(raw_record) = (*file_it).fields[6];
+        get<field::next_pos>   (raw_record) = (*file_it).fields[7];
+        get<field::tlen>       (raw_record) = (*file_it).fields[8];
+        get<field::seq>        (raw_record) = (*file_it).fields[9];
+        get<field::qual>       (raw_record) = (*file_it).fields[10];
+        get<field::header>     (raw_record) = raw_header;
 
         // == .end() that is guaranteed to be char*
-        char * end_qual   = (*file_it).fields[10].data() + (*file_it).fields[10].size();
-        char * end_line   = (*file_it).line.data() +       (*file_it).line.size();
+        char const * end_qual   = (*file_it).fields[10].data() + (*file_it).fields[10].size();
+        char const * end_line   = (*file_it).line.data() +       (*file_it).line.size();
         // == string_view{} if there are no optional fields
-        get<field::optionals>  (raw_record) = std::string_view{end_line, end_line - end_qual};
-
-        // header_ptr does not need to be reset
+        get<field::optionals>  (raw_record) = std::string_view{end_qual, static_cast<size_t>(end_line - end_qual)};
     }
 
     /* PARSED RECORD HANDLING */
+    //TODO fix this in base class
+    static constexpr record field_parsers = detail::make_record<fields<>>();
+
     // override the general case to handle "*"
     template <field field_id, typename parsed_field_t>
-    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field)
+    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field) const
     {
         std::string_view raw_field = get<field_id>(raw_record);
         if (raw_field != "*")
-            static_cast<base_t &>(*this).parse_field(tag<field_id>, parsed_field);
+            static_cast<base_t const &>(*this).parse_field(tag<field_id>, parsed_field);
     }
 
-    void parse_field(tag_t<flag> const & /**/, sam_flag & parsed_field)
+    void parse_field(tag_t<field::flag> const & /**/, am_io::flag & parsed_field) const
     {
-        std::string_view raw_field = get<flag>(raw_record);
+        std::string_view raw_field = get<field::flag>(raw_record);
         uint16_t tmp = 0;
 
-        if (auto r = std::from_chars(raw_field.begin(), raw_field.end(), parsed_field); r.ec != std::errc{})
+        if (auto r = std::from_chars(raw_field.data(), raw_field.data() + raw_field.size(), tmp);
+            r.ec != std::errc{})
+        {
             throw format_error{std::string{"Failed to convert \""} + std::string{raw_field} + "\" into a number."};
+        }
 
-        parsed_field = sam_flag{tmp};
+        parsed_field = am_io::flag{tmp};
     }
 
     template <typename parsed_field_t>
         requires std::ranges::output_range<parsed_field_t, cigar>
-    void parse_field(tag_t<field::cigar> const & /**/, parsed_field_t & parsed_field)
+    void parse_field(tag_t<field::cigar> const & /**/, parsed_field_t & parsed_field) const
     {
-        //TODO parse cigar
+        std::string_view raw_field = get<field::cigar>(raw_record);
+        char const * b = std::ranges::data(raw_field);
+        char const * e = b + std::ranges::size(raw_field);
+
+        while (b != e)
+        {
+            uint64_t i = 0;
+            std::from_chars_result res = std::from_chars(b, e, i);
+            if (res.ec != std::errc{} || res.ptr == e)
+                throw format_error{"Corrupted cigar string encountered"};
+
+            b = res.ptr;
+            parsed_field.emplace_back(i, assign_char_to(*b, exposition_only::cigar_operation{}));
+            ++b;
+        }
     }
 
     template <typename parsed_field_t>
-    void parse_field(tag_t<field::tags> const & /**/, parsed_field_t & parsed_field)
+    void parse_field(tag_t<field::optionals> const & /**/, parsed_field_t & parsed_field) const
     {
         if ((*file_it).fields.size() > 10) // there are optional fields
         {
@@ -129,12 +144,15 @@ private:
         }
     }
 
-    void parse_field(tag_t<field::header_ptr> const & /**/, std::string * & parsed_field)
+    void parse_field(tag_t<field::header> const & /**/, am_io::header const * & parsed_field) const
     {
-        parsed_field = &header;
+        parsed_field = &parsed_header;
     }
 
-
+    static void parse_header(std::string_view raw_header, am_io::header & parsed_header)
+    {
+        //TODO implement
+    }
 
 public:
 
@@ -151,13 +169,13 @@ public:
     {
         /* potentially extract useful runtime options from config and store as members */
 
-        while (file_it != std::default_sentinel && file_it.peak() == '#')
+        while (file_it != std::default_sentinel && file_it.peak() == '@')
         {
             ++file_it;
-            header += (*file_it).line;
+            raw_header += (*file_it).line;
         }
 
-        get<field::header>(raw_record) = std::string_view{raw_header};
+        parse_header(raw_header, parsed_header);
     }
 };
 

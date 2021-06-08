@@ -19,11 +19,11 @@
 
 #include <seqan3/core/platform.hpp>
 
-namespace seqan3
+namespace seqan3::plain_io
 {
 
 //!\brief The value type of seqan3::plaintext_file_input if every line is split into fields.
-struct plaintext_record
+struct record
 {
     //!\brief The entire line (exluding EOL characters but including delimiters).
     std::string_view line;
@@ -32,7 +32,7 @@ struct plaintext_record
 };
 
 //!\brief Option to switch between reading-by-line and splitting a line into fields.
-enum class plaintext_record_kind
+enum class record_kind
 {
     line,               //!< Only the line is provided.
     line_and_fields     //!< The line is provided and also individual fields (seqan3::plaintext_record).
@@ -42,7 +42,7 @@ enum class plaintext_record_kind
 /*!\brief A helper for specifying the header of a seqan3::plaintext_file_input.
  * \tparam record_kind Whether to split lines on delimiter (e.g. TSV files) or not.
  */
-class plaintext_file_header
+class header_kind
 {
 private:
     //!\brief The state of the variable, encoded as the value of the char or the special values -200 and -300.
@@ -64,15 +64,15 @@ public:
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    constexpr plaintext_file_header()                                           noexcept = default;
-    constexpr plaintext_file_header(plaintext_file_header const & )             noexcept = default;
-    constexpr plaintext_file_header(plaintext_file_header && )                  noexcept = default;
-    constexpr plaintext_file_header & operator=(plaintext_file_header const & ) noexcept = default;
-    constexpr plaintext_file_header & operator=(plaintext_file_header && )      noexcept = default;
+    constexpr header_kind()                                           noexcept = default;
+    constexpr header_kind(header_kind const & )             noexcept = default;
+    constexpr header_kind(header_kind && )                  noexcept = default;
+    constexpr header_kind & operator=(header_kind const & ) noexcept = default;
+    constexpr header_kind & operator=(header_kind && )      noexcept = default;
 
-    constexpr plaintext_file_header(decltype(none))         noexcept : state{-200} {}
-    constexpr plaintext_file_header(decltype(first_line))   noexcept : state{-300} {}
-    constexpr plaintext_file_header(starts_with s)          noexcept : state{s.c}  {}
+    constexpr header_kind(decltype(none))         noexcept : state{-200} {}
+    constexpr header_kind(decltype(first_line))   noexcept : state{-300} {}
+    constexpr header_kind(starts_with s)          noexcept : state{s.c}  {}
     //!\}
 
     /*!\name Functions for retrieving the state.
@@ -86,7 +86,7 @@ public:
     {
         if (!is_starts_with())
         {
-            throw std::logic_error{"Tried to read starts_with from plaintext_file_header but it was in a "
+            throw std::logic_error{"Tried to read starts_with from header_kind but it was in a "
                                    "different state."};
         }
 

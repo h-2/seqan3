@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------------------------------
 
 /*!\file
- * \brief Provides seqan3::plaintext_file_output.
+ * \brief Provides seqan3::writer.
  * \author Hannes Hauswedell <hannes.hauswedell AT decode.is>
  */
 
@@ -23,7 +23,7 @@
 #include <seqan3/io/stream/transparent_ostream.hpp>
 #include <seqan3/std/ranges>
 
-namespace seqan3
+namespace seqan3::plain_io
 {
 
 //TODO
@@ -39,17 +39,17 @@ SEQAN3_CONCEPT ostreamable =
 
 } // namespce seqan3
 
-namespace seqan3::detail
+namespace seqan3::plain_io::detail
 {
 
 template <typename char_t,
           typename traits_t = std::char_traits<char_t>,
-          plaintext_record_kind record_kind = plaintext_record_kind::line>
+          record_kind record_kind_ = record_kind::line>
 class plaintext_output_iterator
 {
 private:
     //!\brief The stream iterator.
-    fast_ostreambuf_iterator<char_t, traits_t> stream_it;
+    seqan3::detail::fast_ostreambuf_iterator<char_t, traits_t> stream_it;
 
     //!\brief Delimiter between fields.
     char_t field_sep = '\t';
@@ -118,7 +118,7 @@ public:
     {}
 
     plaintext_output_iterator(std::basic_ostream<char_t, traits_t> & ostr, char_t const sep)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream_it{ostr}, field_sep{sep}
     {}
 
@@ -152,7 +152,7 @@ public:
 
     //!\brief Writes a character to the associated output stream.
     plaintext_output_iterator & operator=(std::string_view && line)
-        requires (record_kind == plaintext_record_kind::line)
+        requires (record_kind_ == record_kind::line)
     {
         write_line(line);
         return *this;
@@ -161,7 +161,7 @@ public:
     //!\brief Writes a character to the associated output stream.
     template <typename range_of_fields_t>
     plaintext_output_iterator & operator=(range_of_fields_t && range_of_fields)
-        requires (record_kind == plaintext_record_kind::line_and_fields) &&
+        requires (record_kind_ == record_kind::line_and_fields) &&
                   std::ranges::input_range<range_of_fields_t> &&
                   ostreamable<std::ranges::range_reference_t<range_of_fields_t>, char_t>
     {
@@ -171,8 +171,8 @@ public:
     }
 
     //!\brief Writes a character to the associated output stream.
-    plaintext_output_iterator & operator=(plaintext_record const & record)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+    plaintext_output_iterator & operator=(record const & record)
+        requires (record_kind_ == record_kind::line_and_fields)
     {
         write_range_as_fields(record.fields);
         return *this;
@@ -191,7 +191,7 @@ public:
         write_single(std::forward<head_t>(head));
         if constexpr (sizeof...(tail) > 0)
         {
-            if constexpr (record_kind == plaintext_record_kind::line)
+            if constexpr (record_kind_ == record_kind::line)
                 (write_single(std::forward<tail_t>(tail)), ...);
             else
                 ((write_single(field_sep), write_single(std::forward<tail_t>(tail))), ...);
@@ -209,7 +209,7 @@ public:
 
     template <typename range_of_fields_t>
     void write_range_as_fields(range_of_fields_t range_of_fields)
-        requires (record_kind == plaintext_record_kind::line_and_fields) &&
+        requires (record_kind_ == record_kind::line_and_fields) &&
                  std::ranges::input_range<range_of_fields_t> &&
                  ostreamable<std::ranges::range_reference_t<range_of_fields_t>, char_t>
     {
@@ -270,31 +270,31 @@ public:
 
 } // namespace seqan3::detail
 
-namespace seqan3
+namespace seqan3::plain_io
 {
 
 /*!\brief Line-wise writer of plaintext files; supports transparent compression.
- * \tparam record_kind Whether to insert delimiters in lines (e.g. TSV files).
+ * \tparam record_kind_ Whether to insert delimiters in lines (e.g. TSV files).
  *
  * \details
  *
  * TODO
  */
-template <plaintext_record_kind record_kind>
-class plaintext_file_output
+template <record_kind record_kind_>
+class writer
 {
 private:
     //!\brief The element type of this range.
-    using value_type       = std::conditional_t<record_kind == plaintext_record_kind::line,
+    using value_type       = std::conditional_t<record_kind_ == record_kind::line,
                                                 std::string_view,
-                                                plaintext_record>;
+                                                record>;
 public:
     /*!\name Range associated types
      * \brief The types necessary to facilitate the behaviour of an input range (used in record-wise reading).
      * \{
      */
     //!\brief The iterator type of this view (an input iterator).
-    using iterator          = detail::plaintext_output_iterator<char, std::char_traits<char>, record_kind>;
+    using iterator          = detail::plaintext_output_iterator<char, std::char_traits<char>, record_kind_>;
     //!\brief The const iterator type is void, because files are not const-iterable.
     using const_iterator    = void;
     //!\brief The type returned by end().
@@ -305,20 +305,20 @@ public:
      * \{
      */
     //!\brief Default constructor is explicitly deleted, you need to give a stream or file name.
-    plaintext_file_output()                                               = delete;
+    writer()                                               = delete;
     //!\brief Copy construction is explicitly deleted, because you can't have multiple access to the same file.
-    plaintext_file_output(plaintext_file_output const &)                  = delete;
+    writer(writer const &)                  = delete;
     //!\brief Move construction is defaulted.
-    plaintext_file_output(plaintext_file_output &&)                       = default;
+    writer(writer &&)                       = default;
     //!\brief Copy assignment is explicitly deleted, because you can't have multiple access to the same file.
-    plaintext_file_output & operator=(plaintext_file_output const &)      = delete;
+    writer & operator=(writer const &)      = delete;
     //!\brief Move assignment is defaulted.
-    plaintext_file_output & operator=(plaintext_file_output &&)           = default;
+    writer & operator=(writer &&)           = default;
     //!\brief Destructor is defaulted.
-    ~plaintext_file_output()                                              = default;
+    ~writer()                                              = default;
 
     /*!\brief Construct from filename.
-     * \param[in] filename        Path to the file you wish to open.
+     * \param[in] filename        Path that you wish to write to.
      * \param[in] field_separator Delimiter between fields in a line. [optional]
      * \param[in] ostream_options Options passed to the underlying stream; see seqan3::transparent_ostream_options. [optional]
      * \throws seqan3::file_open_error If the file could not be opened, e.g. non-existant or non-readable.
@@ -333,17 +333,17 @@ public:
      * the filename has an extension that indicates that. You can explicitly request a specific kind of compression
      * via the ostream_options.
      */
-    explicit plaintext_file_output(std::filesystem::path const & filename,
+    explicit writer(std::filesystem::path const & filename,
                                    char const field_separator,
                                    transparent_ostream_options const & ostream_options = transparent_ostream_options{})
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{filename, ostream_options}, it{stream, field_separator}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::filesystem::path const & filename,
+    explicit writer(std::filesystem::path const & filename,
                                    transparent_ostream_options const & ostream_options = transparent_ostream_options{})
-        requires (record_kind == plaintext_record_kind::line)
+        requires (record_kind_ == record_kind::line)
         : stream{filename, ostream_options}, it{stream}
     {}
 
@@ -362,58 +362,58 @@ public:
      * This constructor transparently applies a compression stream on top of the stream in case you explicitly
      * request this via the ostream_options (default is no compression).
      */
-    explicit plaintext_file_output(std::ostream & str,
+    explicit writer(std::ostream & str,
                                    char const field_separator,
                                    transparent_ostream_options const & ostream_options)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{str, ostream_options}, it{stream, field_separator}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream & str,
+    explicit writer(std::ostream & str,
                                    transparent_ostream_options const & ostream_options)
-        requires (record_kind == plaintext_record_kind::line)
+        requires (record_kind_ == record_kind::line)
         : stream{str, ostream_options}, it{stream}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream && str,
+    explicit writer(std::ostream && str,
                                    char const field_separator,
                                    transparent_ostream_options const & ostream_options)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{std::move(str), ostream_options}, it{stream, field_separator}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream && str,
+    explicit writer(std::ostream && str,
                                    transparent_ostream_options const & ostream_options)
-        requires (record_kind == plaintext_record_kind::line)
+        requires (record_kind_ == record_kind::line)
         : stream{std::move(str), ostream_options}, it{stream}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream & str,
+    explicit writer(std::ostream & str,
                                    char const field_separator)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{str}, it{stream, field_separator}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream & str)
-        requires (record_kind == plaintext_record_kind::line)
+    explicit writer(std::ostream & str)
+        requires (record_kind_ == record_kind::line)
         : stream{str}, it{stream}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream && str,
+    explicit writer(std::ostream && str,
                                    char const field_separator)
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
         : stream{std::move(str)}, it{stream, field_separator}
     {}
 
     //!\overload
-    explicit plaintext_file_output(std::ostream && str)
-        requires (record_kind == plaintext_record_kind::line)
+    explicit writer(std::ostream && str)
+        requires (record_kind_ == record_kind::line)
         : stream{std::move(str)}, it{stream}
     {}
 
@@ -530,7 +530,7 @@ public:
      */
     template <typename range_of_fields_t>
     //!\cond
-        requires (record_kind == plaintext_record_kind::line)
+        requires (record_kind_ == record_kind::line)
     //!\endcond
     void push_back(std::string_view line)
     {
@@ -551,7 +551,7 @@ public:
      */
     template <typename range_of_fields_t>
     //!\cond
-        requires (record_kind == plaintext_record_kind::line_and_fields) &&
+        requires (record_kind_ == record_kind::line_and_fields) &&
                  std::ranges::input_range<range_of_fields_t> &&
                  ostreamable<std::ranges::range_reference_t<range_of_fields_t>, char>
     //!\endcond
@@ -570,9 +570,9 @@ public:
      *
      * The same as calling push_back(record.fields).
      */
-    void push_back(plaintext_record const & record)
+    void push_back(record const & record)
     //!\cond
-        requires (record_kind == plaintext_record_kind::line_and_fields)
+        requires (record_kind_ == record_kind::line_and_fields)
     //!\endcond
     {
         *it = record.fields;
@@ -604,7 +604,7 @@ public:
     //!\cond
         requires std::convertible_to<std::ranges::range_reference_t<rng_t>, value_type>
     //!\endcond
-    plaintext_file_output & operator=(rng_t && range)
+    writer & operator=(rng_t && range)
     {
         for (auto && record : range)
             push_back(std::forward<decltype(record)>(record));
@@ -639,7 +639,7 @@ public:
      * \include test/snippet/io/sequence_file/sequence_file_output_view_pipeline.cpp
      */
     template <std::ranges::input_range rng_t>
-    friend plaintext_file_output & operator|(rng_t && range, plaintext_file_output & f)
+    friend writer & operator|(rng_t && range, writer & f)
     //!\cond
         requires std::convertible_to<std::ranges::range_reference_t<rng_t>, value_type>
     //!\endcond
@@ -650,7 +650,7 @@ public:
 
     //!\overload
     template <std::ranges::input_range rng_t>
-    friend plaintext_file_output operator|(rng_t && range, plaintext_file_output && f)
+    friend writer operator|(rng_t && range, writer && f)
     //!\cond
         requires std::convertible_to<std::ranges::range_reference_t<rng_t>, value_type>
     //!\endcond
@@ -689,18 +689,16 @@ protected:
 };
 
 template <typename t>
-plaintext_file_output(t &&,
-                      char const,
-                      plaintext_file_header header = plaintext_file_header::none,
-                      transparent_ostream_options const & ostream_options = transparent_ostream_options{})
--> plaintext_file_output<plaintext_record_kind::line_and_fields>;
+writer(t &&,
+       char const,
+       transparent_ostream_options const & ostream_options = transparent_ostream_options{})
+-> writer<record_kind::line_and_fields>;
 
 template <typename t>
-plaintext_file_output(t &&,
-                      plaintext_file_header header = plaintext_file_header::none,
-                      transparent_ostream_options const & ostream_options = transparent_ostream_options{})
--> plaintext_file_output<plaintext_record_kind::line>;
+writer(t &&,
+       transparent_ostream_options const & ostream_options = transparent_ostream_options{})
+-> writer<record_kind::line>;
 
 
-} // namespace seqan3
+} // namespace seqan3::plain_io
 

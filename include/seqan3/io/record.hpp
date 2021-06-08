@@ -83,13 +83,13 @@ enum class field : uint64_t
 
     // Fields unique to alignment io ...........................................
     qname = id,
-    flag,           //!< The alignment flag (bit information), `uint16_t` value.
-    rname = ref_id, //!< The identifier of the (reference) sequence that SEQ was aligned to.
+    flag = comment + 1,           //!< The alignment flag (bit information), `uint16_t` value.
+    /*ref_id*/      //!< The identifier of the (reference) sequence that SEQ was aligned to.
     /*pos*/
     mapq,           //!< The mapping quality of the SEQ alignment, usually a ohred-scaled score.
     cigar,          //!< The cigar vector (std::vector<seqan3::cigar>) representing the alignment in SAM/BAM format.
-    rnext,
-    pnext,
+    next_ref_id,
+    next_pos,
     tlen,
     /*seq*/
     /*qual*/

@@ -48,17 +48,17 @@ public:
      */
 
     //!\brief The value type.
-    using value_type        = typename file_type::value_type;
+    using value_type        = typename file_type::record_type;
     //!\brief The reference type.
-    using reference         = typename file_type::reference;
+    using reference         = typename file_type::record_type &;
     //!\brief The const reference type.
-    using const_reference   = typename file_type::reference;
+    using const_reference   = typename file_type::record_type &;
     //!\brief The size type.
-    using size_type         = typename file_type::size_type;
+    using size_type         = size_t;
     //!\brief The difference type. A signed integer type, usually std::ptrdiff_t.
-    using difference_type   = typename file_type::difference_type;
+    using difference_type   = ptrdiff_t;
     //!\brief The pointer type.
-    using pointer           = typename file_type::value_type *;
+    using pointer           = typename file_type::record_type *;
     //!\brief Tag this class as an input iterator.
     using iterator_category = std::input_iterator_tag;
     //!\}

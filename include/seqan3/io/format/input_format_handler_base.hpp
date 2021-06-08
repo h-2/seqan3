@@ -16,10 +16,11 @@
 #include <string_view>
 #include <vector>
 
-#include <seqan3/io/configuration/all.hpp>
+// #include <seqan3/io/configuration/all.hpp>
+#include <seqan3/alphabet/views/char_strictly_to.hpp>
 #include <seqan3/io/detail/misc.hpp>
+#include <seqan3/io/utility.hpp>
 #include <seqan3/io/record.hpp>
-#include <seqan3/range/views/char_strictly_to.hpp>
 #include <seqan3/std/charconv>
 #include <seqan3/std/span>
 
@@ -55,7 +56,7 @@ private:
 
     /* stuff for turning raw record into parsed record */
     template <field ... field_ids, typename parsed_record_t>
-    void parse_record(fields<field_ids...> const & /**/, parsed_record_t & parsed_record) const
+    void parse_record(tag_t<field_ids...> const & /**/, parsed_record_t & parsed_record) const
     {
         (to_derived()->parse_field_wrapper(tag<field_ids>, parsed_record), ...);
     }
@@ -92,7 +93,7 @@ private:
         {
             using target_alph_type = std::ranges::range_value_t<parsed_field_t>;
 
-            constexpr auto adaptor = get_or<field_id>(derived_t::field_parsers, std::views::all /*NOOP*/);
+            auto adaptor = detail::get_or<field_id>(derived_t::field_parsers, std::views::all /*NOOP*/);
 
             if constexpr (std::constructible_from<target_alph_type, char>) // no alphabet conversion
             {
