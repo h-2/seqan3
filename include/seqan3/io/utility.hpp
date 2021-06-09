@@ -21,8 +21,26 @@
 namespace seqan3
 {
 
-template <auto v, auto ... more_vs>
+template <auto ... more_vs>
 struct tag_t
+{
+    static constexpr size_t size = 0;
+
+    static constexpr auto as_tuple = std::tuple{};
+
+    static constexpr bool contains(auto &&)
+    {
+        return false;
+    }
+
+    static constexpr size_t index_of(auto && s)
+    {
+        return static_cast<size_t>(-1ULL);
+    }
+};
+
+template <auto v, auto ... more_vs>
+struct tag_t<v, more_vs...>
 {
     static constexpr size_t size = sizeof...(more_vs) + 1;
 
@@ -57,8 +75,8 @@ struct tag_t
 
 };
 
-template <auto v, auto ... more_vs>
-inline constexpr tag_t<v, more_vs...> tag{};
+template <auto ... more_vs>
+inline constexpr tag_t<more_vs...> tag{};
 
 
 template <typename type, typename ... more_types>

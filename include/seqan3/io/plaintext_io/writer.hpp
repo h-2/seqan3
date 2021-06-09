@@ -18,7 +18,7 @@
 
 #include <seqan3/alphabet/concept.hpp>
 #include <seqan3/alphabet/views/to_char.hpp>
-#include <seqan3/io/file/plaintext_file_util.hpp>
+#include <seqan3/io/plaintext_io/misc.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/io/stream/transparent_ostream.hpp>
 #include <seqan3/std/ranges>
@@ -275,6 +275,7 @@ namespace seqan3::plain_io
 
 /*!\brief Line-wise writer of plaintext files; supports transparent compression.
  * \tparam record_kind_ Whether to insert delimiters in lines (e.g. TSV files).
+ * \ingroup plaintext_io
  *
  * \details
  *
@@ -334,15 +335,15 @@ public:
      * via the ostream_options.
      */
     explicit writer(std::filesystem::path const & filename,
-                                   char const field_separator,
-                                   transparent_ostream_options const & ostream_options = transparent_ostream_options{})
+                    char const field_separator,
+                    transparent_ostream_options const & ostream_options = transparent_ostream_options{})
         requires (record_kind_ == record_kind::line_and_fields)
         : stream{filename, ostream_options}, it{stream, field_separator}
     {}
 
     //!\overload
     explicit writer(std::filesystem::path const & filename,
-                                   transparent_ostream_options const & ostream_options = transparent_ostream_options{})
+                    transparent_ostream_options const & ostream_options = transparent_ostream_options{})
         requires (record_kind_ == record_kind::line)
         : stream{filename, ostream_options}, it{stream}
     {}
@@ -363,37 +364,37 @@ public:
      * request this via the ostream_options (default is no compression).
      */
     explicit writer(std::ostream & str,
-                                   char const field_separator,
-                                   transparent_ostream_options const & ostream_options)
+                    char const field_separator,
+                    transparent_ostream_options const & ostream_options)
         requires (record_kind_ == record_kind::line_and_fields)
         : stream{str, ostream_options}, it{stream, field_separator}
     {}
 
     //!\overload
     explicit writer(std::ostream & str,
-                                   transparent_ostream_options const & ostream_options)
+                    transparent_ostream_options const & ostream_options)
         requires (record_kind_ == record_kind::line)
         : stream{str, ostream_options}, it{stream}
     {}
 
     //!\overload
     explicit writer(std::ostream && str,
-                                   char const field_separator,
-                                   transparent_ostream_options const & ostream_options)
+                    char const field_separator,
+                    transparent_ostream_options const & ostream_options)
         requires (record_kind_ == record_kind::line_and_fields)
         : stream{std::move(str), ostream_options}, it{stream, field_separator}
     {}
 
     //!\overload
     explicit writer(std::ostream && str,
-                                   transparent_ostream_options const & ostream_options)
+                    transparent_ostream_options const & ostream_options)
         requires (record_kind_ == record_kind::line)
         : stream{std::move(str), ostream_options}, it{stream}
     {}
 
     //!\overload
     explicit writer(std::ostream & str,
-                                   char const field_separator)
+                    char const field_separator)
         requires (record_kind_ == record_kind::line_and_fields)
         : stream{str}, it{stream, field_separator}
     {}
@@ -406,7 +407,7 @@ public:
 
     //!\overload
     explicit writer(std::ostream && str,
-                                   char const field_separator)
+                    char const field_separator)
         requires (record_kind_ == record_kind::line_and_fields)
         : stream{std::move(str)}, it{stream, field_separator}
     {}

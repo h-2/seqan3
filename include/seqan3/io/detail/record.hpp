@@ -25,17 +25,6 @@ namespace seqan3::detail
 {
 
 // ----------------------------------------------------------------------------
-// Fields
-// ----------------------------------------------------------------------------
-
-/*!\brief Auxiliary concept that checks whether a type is a specialisation of seqan3::fields.
- * \ingroup io
- * \relates seqan3::fields
- */
-template <typename t>
-SEQAN3_CONCEPT fields_specialisation = is_value_specialisation_of_v<t, fields>;
-
-// ----------------------------------------------------------------------------
 // select_types_with_ids
 // ----------------------------------------------------------------------------
 

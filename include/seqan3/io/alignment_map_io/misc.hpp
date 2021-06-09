@@ -20,6 +20,8 @@
 
 #include <seqan3/core/concept/core_language.hpp>
 #include <seqan3/core/detail/template_inspection.hpp>
+#include <seqan3/io/record.hpp>
+#include <seqan3/io/utility.hpp>
 #include <seqan3/range/container/small_string.hpp>
 #include <seqan3/std/concepts>
 #include <seqan3/utility/char_operations/predicate.hpp>
@@ -44,7 +46,7 @@ inline constexpr auto default_field_ids = tag<field::qname,
 
 
 //!\brief Stores the header information of alignment files.
-//!\ingroup alignment_file
+//!\ingroup alignment_map_io
 struct header
 {
     //!\brief Stores information of the program/tool that was used to create the file.
@@ -76,13 +78,8 @@ struct header
 };
 
 
-
-//!\brief Type tag which indicates that no reference information has been passed to the alignment file on construction.
-struct ref_info_not_given
-{};
-
 /*!\brief An enum flag that describes the properties of an aligned read (given as a SAM record).
- * \ingroup am_io
+ * \ingroup alignment_map_io
  *
  * The SAM flag is a bitwise flags, which means that each value corresponds to a specific bit that is set and that they
  * can be combined and tested using binary operations.
@@ -171,7 +168,7 @@ namespace seqan3::literals
 {
 
 /*!\brief The SAM tag literal, such that tags can be used in constant expressions.
- * \ingroup alignment_file_io
+ * \ingroup alignment_map_io
  * \tparam char_t The char type. Usually `char`. Parameter pack `...s` must be of
  *                length 2, since SAM tags consist of two letters (char0 and char1).
  * \returns The unique identifier of the SAM tag computed by char0 * 128 + char1.
@@ -222,7 +219,7 @@ namespace seqan3::am_io
 {
 
 //!\brief std::variant of allowed types for optional tag fields of the SAM format.
-//!\ingroup alignment_file_io
+//!\ingroup alignment_map_io
 using sam_tag_variant = std::variant<char, int32_t, float, std::string,
                                         std::vector<int8_t>, std::vector<uint8_t>,
                                         std::vector<int16_t>, std::vector<uint16_t>,
@@ -235,7 +232,7 @@ using sam_tag_variant = std::variant<char, int32_t, float, std::string,
 // char constexpr sam_tag_trait_char_extra[11] = {'\0', '\0', '\0', '\0', 'c', 'C', 's', 'S', 'i', 'I', 'f'};
 
 /*!\brief The generic base class.
- * \ingroup alignment_file_io
+ * \ingroup alignment_map_io
  *
  * \attention This is a pure base class that needs to be specialized in order to
  *            be used.
@@ -318,7 +315,7 @@ struct sam_tag_trait
 };
 
 //!\brief Short cut helper for seqan3::sam_tag_trait::type.
-//!\ingroup alignment_file_io
+//!\ingroup alignment_map_io
 template <uint16_t tag_value>
 using sam_tag_trait_t = typename sam_tag_trait<tag_value>::type;
 
@@ -392,7 +389,7 @@ template <> struct sam_tag_trait<"UQ"_sam_tag> { using type = int32_t; };
 //!\endcond
 
 /*!\brief The SAM tag dictionary class that stores all optional SAM fields.
- * \ingroup alignment_file_io
+ * \ingroup alignment_map_io
  *
  * \details
  *

@@ -23,6 +23,7 @@ namespace seqan3::plain_io
 {
 
 //!\brief The value type of seqan3::plaintext_file_input if every line is split into fields.
+//!\ingroup plaintext_io
 struct record
 {
     //!\brief The entire line (exluding EOL characters but including delimiters).
@@ -32,6 +33,7 @@ struct record
 };
 
 //!\brief Option to switch between reading-by-line and splitting a line into fields.
+//!\ingroup plaintext_io
 enum class record_kind
 {
     line,               //!< Only the line is provided.
@@ -41,6 +43,11 @@ enum class record_kind
 
 /*!\brief A helper for specifying the header of a seqan3::plaintext_file_input.
  * \tparam record_kind Whether to split lines on delimiter (e.g. TSV files) or not.
+ * \ingroup plaintext_io
+ *
+ * \details
+ *
+ * TODO explain how this can be used easily
  */
 class header_kind
 {
@@ -64,7 +71,7 @@ public:
     /*!\name Constructors, destructor and assignment
      * \{
      */
-    constexpr header_kind()                                           noexcept = default;
+    constexpr header_kind()                                 noexcept = default;
     constexpr header_kind(header_kind const & )             noexcept = default;
     constexpr header_kind(header_kind && )                  noexcept = default;
     constexpr header_kind & operator=(header_kind const & ) noexcept = default;

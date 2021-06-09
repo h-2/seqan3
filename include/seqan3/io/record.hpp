@@ -103,7 +103,7 @@ enum class field : uint64_t
     /*pos*/
     /*id*/
     /*ref*/
-    alt,
+    alt = alignment + 1,
     /*qual*/
     filter,
     info,
@@ -130,41 +130,41 @@ enum class field : uint64_t
  * \include test/snippet/io/record_1.cpp
  *
  */
-template <field ...fs>
-struct fields
-{
-    //!\privatesection
-    //!\brief The template parameters stored in an array for easy access.
-    static constexpr std::array<field, sizeof...(fs)> as_array{fs...};
-
-    //!\brief Special value that indicates that index_of() failed.
-    static constexpr size_t npos = std::numeric_limits<size_t>::max();
-
-    //!\brief Retrieve the position of field in the parameter pack.
-    static constexpr size_t index_of(field f)
-    {
-        for (size_t i = 0; i < sizeof...(fs); ++i)
-            if (as_array[i] == f)
-                return i;
-        return npos;
-    }
-
-    //!\brief Whether a field is contained in the parameter pack.
-    static constexpr bool contains(field f)
-    {
-        return index_of(f) != npos;
-    }
-
-    static_assert([] () constexpr
-                  {
-                      for (size_t i = 0; i < as_array.size(); ++i)
-                          for (size_t j = i + 1; j < as_array.size(); ++j)
-                              if (as_array[i] == as_array[j])
-                                  return false;
-
-                      return true;
-                  } (), "You may not include a field twice into fields<>.");
-};
+// template <field ...fs>
+// struct fields
+// {
+//     //!\privatesection
+//     //!\brief The template parameters stored in an array for easy access.
+//     static constexpr std::array<field, sizeof...(fs)> as_array{fs...};
+//
+//     //!\brief Special value that indicates that index_of() failed.
+//     static constexpr size_t npos = std::numeric_limits<size_t>::max();
+//
+//     //!\brief Retrieve the position of field in the parameter pack.
+//     static constexpr size_t index_of(field f)
+//     {
+//         for (size_t i = 0; i < sizeof...(fs); ++i)
+//             if (as_array[i] == f)
+//                 return i;
+//         return npos;
+//     }
+//
+//     //!\brief Whether a field is contained in the parameter pack.
+//     static constexpr bool contains(field f)
+//     {
+//         return index_of(f) != npos;
+//     }
+//
+//     static_assert([] () constexpr
+//                   {
+//                       for (size_t i = 0; i < as_array.size(); ++i)
+//                           for (size_t j = i + 1; j < as_array.size(); ++j)
+//                               if (as_array[i] == as_array[j])
+//                                   return false;
+//
+//                       return true;
+//                   } (), "You may not include a field twice into fields<>.");
+// };
 
 // ----------------------------------------------------------------------------
 // record
@@ -235,7 +235,7 @@ public:
     using base_type::base_type;
     //!\}
 
-    static_assert(field_types::size() == field_ids::as_array.size(),
+    static_assert(field_types::size() == field_ids::size,
                   "You must give as many IDs as types to seqan3::record.");
 
     //!\brief Clears containers that provide `.clear()` and (re-)initialises all other elements with `= {}`.

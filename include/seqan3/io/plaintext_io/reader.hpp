@@ -16,7 +16,7 @@
 #include <string_view>
 #include <variant>
 
-#include <seqan3/io/file/plaintext_file_util.hpp>
+#include <seqan3/io/plaintext_io/misc.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/io/stream/transparent_istream.hpp>
 
@@ -290,7 +290,7 @@ namespace seqan3::plain_io
 
 /*!\brief Line-wise reader of plaintext files; supports transparent decompression.
  * \tparam record_kind_ Whether to split lines on delimiter (e.g. TSV files) or not.
- *
+ * \ingroup plaintext_io
  * \details
  *
  * Main features:
@@ -334,7 +334,7 @@ public:
      * \{
      */
     //!\brief Default constructor is explicitly deleted, you need to give a stream or file name.
-    reader()                                              = delete;
+    reader()                                = delete;
     //!\brief Copy construction is explicitly deleted, because you can't have multiple access to the same file.
     reader(reader const &)                  = delete;
     //!\brief Move construction is defaulted.
@@ -344,7 +344,7 @@ public:
     //!\brief Move assignment is defaulted.
     reader & operator=(reader &&)           = default;
     //!\brief Destructor is defaulted.
-    ~reader()                                             = default;
+    ~reader()                               = default;
 
     /*!\brief Construct from filename.
      * \param[in] filename        Path to the file you wish to open.
@@ -510,6 +510,7 @@ public:
     }
 
 protected:
+    //!\privatesection
     //!\brief Process the header (if requested).
     void read_header(header_kind _header)
     {
@@ -559,39 +560,15 @@ protected:
 
 template <typename t>
 reader(t &&,
-                     char const,
-                     header_kind header = header_kind::none,
-                     transparent_istream_options const & istream_options = transparent_istream_options{})
+       char const,
+       header_kind header = header_kind::none,
+       transparent_istream_options const & istream_options = transparent_istream_options{})
 -> reader<record_kind::line_and_fields>;
 
 template <typename t>
 reader(t &&,
-                     header_kind header = header_kind::none,
-                     transparent_istream_options const & istream_options = transparent_istream_options{})
+       header_kind header = header_kind::none,
+       transparent_istream_options const & istream_options = transparent_istream_options{})
 -> reader<record_kind::line>;
 
-// reader(std::istream &,
-//                      char const,
-//                      header_kind header = header_kind::none,
-//                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> reader<record_kind::line_and_fields>;
-//
-// reader(std::istream &,
-//                      header_kind header = header_kind::none,
-//                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> reader<record_kind::line>;
-//
-// reader(std::istream &&,
-//                      char const,
-//                      header_kind header = header_kind::none,
-//                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> reader<record_kind::line_and_fields>;
-//
-// reader(std::istream &&,
-//                      header_kind header = header_kind::none,
-//                      transparent_istream_options const & istream_options = transparent_istream_options{})
-// -> reader<record_kind::line>;
-
-
-} // namespace seqan3
-
+} // namespace seqan3::plain_io

@@ -19,8 +19,8 @@
 #include <vector>
 
 #include <seqan3/core/range/type_traits.hpp>
-#include <seqan3/io/file/am_io_util.hpp>
-#include <seqan3/io/file/plaintext_file_input.hpp>
+#include <seqan3/io/alignment_map_io/misc.hpp>
+#include <seqan3/io/plaintext_io/reader.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/utility/char_operations/predicate.hpp>
@@ -89,7 +89,7 @@ private:
 
     /* PARSED RECORD HANDLING */
     //TODO fix this in base class
-    static constexpr record field_parsers = detail::make_record<fields<>>();
+    static constexpr record field_parsers = record<type_list<>, tag_t<>>{};
 
     // override the general case to handle "*"
     template <field field_id, typename parsed_field_t>

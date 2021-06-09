@@ -26,6 +26,7 @@
 #include <seqan3/io/format/input_format_handler_base.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/io/stream/istreambuf_view.hpp>
+#include <seqan3/io/utility.hpp>
 #include <seqan3/alphabet/views/to_char.hpp>
 #include <seqan3/range/detail/misc.hpp>
 #include <seqan3/std/algorithm>
@@ -46,8 +47,8 @@ private:
     friend base_t;
 
     /* RAW RECORD HANDLING*/
-    using format_fields = fields<field::id, field::seq>;
-    using raw_record_type = seqan3::record<list_traits::repeat<format_fields::as_array.size(), std::string_view>,
+    using format_fields = tag_t<field::id, field::seq>;
+    using raw_record_type = seqan3::record<list_traits::repeat<format_fields::size, std::string_view>,
                                            format_fields>;
 
     raw_record_type raw_record;
@@ -77,7 +78,7 @@ private:
     }
 
     /* PARSED RECORD HANDLING */
-    static constexpr record field_parsers = detail::make_record<fields<field::seq>>(
+    static constexpr record field_parsers = detail::make_record<tag_t<field::seq>>(
         std::views::filter(!(is_space || is_digit))     // digits and spaces filtered from seq
         );
 
