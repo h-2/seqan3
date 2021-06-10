@@ -15,8 +15,7 @@
 
 #include <tuple>
 
-#include <seqan3/core/platform.hpp>
-
+#include <seqan3/utility/type_list/type_list.hpp>
 
 namespace seqan3
 {
@@ -33,7 +32,7 @@ struct tag_t
         return false;
     }
 
-    static constexpr size_t index_of(auto && s)
+    static constexpr size_t index_of(auto &&)
     {
         return static_cast<size_t>(-1ULL);
     }

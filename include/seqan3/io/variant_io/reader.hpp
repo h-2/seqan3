@@ -65,7 +65,7 @@ inline constexpr auto string_field_types = list_traits::repeat<default_field_ids
  */
 template <typename field_ids_t = decltype(default_field_ids),
           typename field_types_t = decltype(default_field_types),
-          typename formats_t = type_list<format_sam>>
+          typename formats_t = type_list<format_vcf>>
 struct reader_options
 {
     //!\brief The fields that shall be contained in each record; a seqan3::tag over seqan3::field.

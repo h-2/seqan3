@@ -16,6 +16,7 @@
 #include <tuple>
 
 #include <seqan3/core/detail/template_inspection.hpp>
+#include <seqan3/utility/type_list/type_list.hpp>
 
 namespace seqan3
 {
@@ -102,8 +103,8 @@ enum class field : uint64_t
     chrom = ref_id, //
     /*pos*/
     /*id*/
-    /*ref*/
-    alt = alignment + 1,
+    ref = alignment + 1,
+    alt,
     /*qual*/
     filter,
     info,

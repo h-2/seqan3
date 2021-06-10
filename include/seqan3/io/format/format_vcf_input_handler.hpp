@@ -14,21 +14,26 @@
 #pragma once
 
 #include <iostream>
+#include <regex>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include <seqan3/alphabet/views/char_strictly_to.hpp>
+#include <seqan3/alphabet/views/char_to.hpp>
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/io/detail/ignore_output_iterator.hpp>
 #include <seqan3/io/detail/misc.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
 #include <seqan3/io/format/format_vcf.hpp>
+#include <seqan3/io/plaintext_io/reader.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/io/variant_io/misc.hpp>
 #include <seqan3/range/detail/misc.hpp>
-#include <seqan3/range/views/char_strictly_to.hpp>
 #include <seqan3/std/algorithm>
 #include <seqan3/std/ranges>
+#include <seqan3/utility/type_list/traits.hpp>
+#include <seqan3/utility/views/to.hpp>
 
 namespace seqan3
 {
@@ -80,34 +85,32 @@ private:
         // line.end() that is guaranteed to be char*
         char const * end_line   = (*file_it).line.data()      + (*file_it).line.size();
         // genotypes fo from end of qual til end of line (possibly empty)
-        get<field::genotypes>  (raw_record) = std::string_view{end_qual, end_line - end_qual};
+        get<field::genotypes>  (raw_record) = std::string_view{end_qual, static_cast<size_t>(end_line - end_qual)};
 
         // header does not need to be reset
     }
 
     /* PARSED RECORD HANDLING */
-    header parsed_header;
+    var_io::header parsed_header;
 
     // override the general case to handle MISSING value
-    template <field field_id, typename parsed_field_t>
-    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field) const
-    {
-        if (get<field_id>(raw_record) != variant_file_special_value::MISSING)
-            static_cast<base_t &>(*this).parse_field(tag<field_id>, parsed_field);
-    }
+//     template <field field_id, typename parsed_field_t>
+//     void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field) const
+//     {
+//         if (get<field_id>(raw_record) != var_io::special_value::missing)
+//             static_cast<base_t const &>(*this).parse_field(tag<field_id>, parsed_field);
+//     }
 
+    using base_t::parse_field;
 
-    void parse_field(tag_t<field::alt> const & /**/, allele & parsed_field) const
+    void parse_field(tag_t<field::ref> const & /**/, var_io::allele & parsed_field) const
     {
         std::string_view raw_field = get<field::alt>(raw_record);
-        if (raw_field.contains(","))
-            throw format_error{"Alt field contains multiple alleles but only one expected."};
-        else
-            parsed_field = parse_alt_impl(raw_field);
+        parsed_field = parse_alt_impl(raw_field);
     }
 
     // TODO: make this back_insertable instead vector
-    void parse_field(tag_t<field::alt> const & /**/, std::vector<allele> & parsed_field) const
+    void parse_field(tag_t<field::alt> const & /**/, std::vector<var_io::allele> & parsed_field) const
     {
         std::string_view raw_field = get<field::alt>(raw_record);
 
@@ -116,7 +119,7 @@ private:
         {
             if (i == raw_field.size() || raw_field[i] == ',')
             {
-                parse_field.push_back(parse_alt_impl(raw_field.substr(last_begin, i), allele));
+                parsed_field.push_back(parse_alt_impl(raw_field.substr(last_begin, i)));
                 last_begin = i + 1;
             }
         }
@@ -131,35 +134,35 @@ private:
         }
     }
 
-    void parse_field(tag_t<field::header_ptr> const & /**/, header * & parsed_field) const
+    void parse_field(tag_t<field::header> const & /**/, var_io::header const * & parsed_field) const
     {
         parsed_field = &parsed_header;
     }
 
-    void parse_field(tag_t<field::header_ptr> const & /**/, std::string_view & parsed_field) const
+    void parse_field(tag_t<field::header> const & /**/, std::string_view & parsed_field) const
     {
-        parsed_field = &raw_header;
+        parsed_field = raw_header;
     }
 
     /* TODO move to mixin: */
 
-    static allele parse_alt_impl(std::string_view in)
+    static var_io::allele parse_alt_impl(std::string_view in)
     {
         std::regex is_seq{"^[ACGTNacgtn]+$"};
 
         if (in == "*")
-            return variant_file_special_value::unknown;
+            return var_io::special_value::unknown;
         else if (in == ".")
-            return variant_file_special_value::missing;
+            return var_io::special_value::missing;
         else if (std::regex_match(in.begin(), in.end(), is_seq))
             return in | views::char_to<dna5> | views::to<std::vector<dna5>>;
         else
             return std::string{in};
     }
 
-    static header parse_header(std::string_view raw_header)
+    static var_io::header parse_header(std::string_view raw_header)
     {
-        header ret;
+        var_io::header ret;
 
         //TODO implement
 
@@ -182,15 +185,54 @@ public:
     {
         /* potentially extract useful runtime options from config and store as members */
 
+        bool file_format_read = false;
         while (file_it != std::default_sentinel && file_it.peak() == '#')
         {
             ++file_it;
-            raw_header += (*file_it).line;
+            std::string_view l = file_it->line;
+            raw_header += l;
+            if (file_format_read == false)
+            {
+                if (l.starts_with("##fileformat="))
+                {
+                    parsed_header.file_format = l.substr(13);
+                    file_format_read = true;
+                }
+                else
+                {
+                    throw format_error{"File does not begin with \"##fileformat\"."};
+                }
+            }
+            else if (l.starts_with("##fileformat="))
+            {
+                throw format_error{"File has two lines that begin with \"##fileformat\"."};
+            }
+            else if (l.starts_with("##INFO="))
+            {
+                //TODO implement
+            }
+            else if (l.starts_with("##FILTER="))
+            {
+                //TODO implement
+            }
+            else if (l.starts_with("##FORMAT="))
+            {
+                //TODO implement
+            }
+            else if (l.starts_with("##contig="))
+            {
+                //TODO implement
+            }
+            else
+            {
+                parsed_header.other_lines.push_back(static_cast<std::string>(l));
+            }
         }
 
-        get<field::header>(raw_record)  = &raw_header;
-        raw_header_as_bytes             = std::span<std::byte>{raw_header.data(), raw_header.size()};
-        parsed_header                   = parse_header(raw_header);
+        get<field::header>(raw_record)  = raw_header;
+        raw_header_as_bytes             = std::span<std::byte>{reinterpret_cast<std::byte*>(raw_header.data()),
+                                                               raw_header.size()};
+//         parsed_header                   = parse_header(raw_header);
     }
 };
 

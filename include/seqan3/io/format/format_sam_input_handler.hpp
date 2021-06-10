@@ -21,9 +21,11 @@
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/io/alignment_map_io/misc.hpp>
 #include <seqan3/io/plaintext_io/reader.hpp>
+#include <seqan3/io/format/format_sam.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
 #include <seqan3/io/stream/iterator.hpp>
 #include <seqan3/utility/char_operations/predicate.hpp>
+#include <seqan3/utility/type_list/traits.hpp>
 
 namespace seqan3
 {
@@ -97,7 +99,7 @@ private:
     {
         std::string_view raw_field = get<field_id>(raw_record);
         if (raw_field != "*")
-            static_cast<base_t const &>(*this).parse_field(tag<field_id>, parsed_field);
+            static_cast<base_t const *>(this)->parse_field(tag<field_id>, parsed_field);
     }
 
     void parse_field(tag_t<field::flag> const & /**/, am_io::flag & parsed_field) const

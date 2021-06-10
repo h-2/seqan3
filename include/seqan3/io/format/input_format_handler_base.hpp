@@ -16,20 +16,37 @@
 #include <string_view>
 #include <vector>
 
-// #include <seqan3/io/configuration/all.hpp>
 #include <seqan3/alphabet/views/char_strictly_to.hpp>
 #include <seqan3/io/detail/misc.hpp>
+#include <seqan3/io/detail/record.hpp>
 #include <seqan3/io/utility.hpp>
 #include <seqan3/io/record.hpp>
 #include <seqan3/std/charconv>
 #include <seqan3/std/span>
 
+namespace seqan3::detail
+{
+
+template <field field_id, typename input_format_handler_t>
+    requires (requires { input_format_handler_t::field_parser_views; })
+auto get_or_view_all(input_format_handler_t && handler)
+{
+    return detail::get_or<field_id>(handler, std::views::all /*NOOP*/);
+}
+
+template <field field_id, typename input_format_handler_t>
+auto get_or_view_all(input_format_handler_t && handler)
+{
+    return std::views::all;
+}
+
+} // namespace seqan3::detail
 
 namespace seqan3
 {
 
 template <typename format_t>
-struct input_format_handler;
+class input_format_handler;
 
 
 template <typename derived_t>
@@ -73,7 +90,8 @@ private:
 
             if constexpr (std::same_as<parsed_field_t, std::span<std::byte>>)
             {
-                parsed_field = std::span<std::byte>{raw_field.data(), raw_field.size()};
+                parsed_field = std::span<std::byte>{reinterpret_cast<std::byte*>(raw_field.data()),
+                                                    raw_field.size()};
             }
             else
             {
@@ -89,11 +107,11 @@ private:
     {
         std::string_view raw_field = get<field_id>(to_derived()->raw_record);
 
-        if constexpr (std::ranges::range<parsed_field_t>)
+        if constexpr (std::ranges::range<parsed_field_t>) //TODO output_range
         {
             using target_alph_type = std::ranges::range_value_t<parsed_field_t>;
 
-            auto adaptor = detail::get_or<field_id>(derived_t::field_parsers, std::views::all /*NOOP*/);
+            auto adaptor = detail::get_or_view_all<field_id>(to_derived());
 
             if constexpr (std::constructible_from<target_alph_type, char>) // no alphabet conversion
             {
