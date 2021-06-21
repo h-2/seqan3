@@ -38,8 +38,6 @@ inline constexpr auto raw_field_types = list_traits::repeat<default_field_ids.si
 //!\ingroup sequence_io
 inline constexpr auto string_field_types = list_traits::repeat<default_field_ids.size, std::string>{};
 
-
-
 /*!\brief Options that can be used to configure the behaviour of seqan3::am_io::reader.
  * \tparam field_ids_t   Type of the field_ids member (usually deduced).
  * \tparam field_types_t Type of the field_types member (usually deduced).

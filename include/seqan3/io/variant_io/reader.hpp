@@ -47,7 +47,7 @@ inline constexpr auto default_field_types = type_tag<std::string, //TOOD int32_t
 //!\ingroup variant_io
 inline constexpr auto raw_field_types = list_traits::repeat<default_field_ids.size, std::span<std::byte>>{};
 
-//!\brief Every field is configured as a std::string (this enables "raw" io).
+//!\brief Every field is configured as a std::string.
 //!\ingroup variant_io
 inline constexpr auto string_field_types = list_traits::repeat<default_field_ids.size, std::string>{};
 

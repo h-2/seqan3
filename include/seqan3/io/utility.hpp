@@ -82,5 +82,37 @@ template <typename type, typename ... more_types>
 inline constexpr type_list<type, more_types...> type_tag{};
 
 
+//!\brief Enumerator to ease "dynamic typing" in alignment map IO and variant IO.
+enum class io_type_id
+{
+    flag,
+    char8,
+    int32,
+    float32,
+    string,
+    vector_of_int8,
+    vector_of_uint8,
+    vector_of_int16,
+    vector_of_uint16,
+    vector_of_int32,
+    vector_of_uint32,
+    vector_of_float32
+};
+
+//!\brief Variant to handle "dynamic typing" in alignment map IO and variant IO.
+using io_type_variant = std::variant<bool,
+                                     char,
+                                     int32_t,
+                                     float,
+                                     std::string,
+                                     std::vector<int8_t>,
+                                     std::vector<uint8_t>,
+                                     std::vector<int16_t>,
+                                     std::vector<uint16_t>,
+                                     std::vector<int32_t>,
+                                     std::vector<uint32_t>,
+                                     std::vector<float>>;
+
+
 } // namespace seqan3
 

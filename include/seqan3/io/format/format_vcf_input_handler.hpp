@@ -49,22 +49,11 @@ private:
     friend base_t;
 
     /* RAW RECORD HANDLING*/
-    using format_fields = tag_t<field::chrom,
-                                 field::pos,
-                                 field::id,
-                                 field::ref,
-                                 field::alt,
-                                 field::qual,
-                                 field::filter,
-                                 field::info,
-                                 field::genotypes,
-                                 field::header>;
-    using raw_record_type = seqan3::record<list_traits::repeat<format_fields::size, std::string_view>,
-                                           format_fields>;
+    using format_fields     = decltype(var_io::default_field_ids);
+    using raw_record_type   = seqan3::record<list_traits::repeat<format_fields::size, std::string_view>,
+                                             format_fields>;
 
     raw_record_type             raw_record;
-    std::string                 raw_header;
-    std::span<std::byte>        raw_header_as_bytes;
     plain_io::detail::plaintext_input_iterator<char, std::char_traits<char>, plain_io::record_kind::line_and_fields> file_it;
 
     void read_raw_record()
@@ -91,7 +80,7 @@ private:
     }
 
     /* PARSED RECORD HANDLING */
-    var_io::header parsed_header;
+    var_io::header header;
 
     // override the general case to handle MISSING value
 //     template <field field_id, typename parsed_field_t>
@@ -136,13 +125,9 @@ private:
 
     void parse_field(tag_t<field::header> const & /**/, var_io::header const * & parsed_field) const
     {
-        parsed_field = &parsed_header;
+        parsed_field = &header;
     }
 
-    void parse_field(tag_t<field::header> const & /**/, std::string_view & parsed_field) const
-    {
-        parsed_field = raw_header;
-    }
 
     /* TODO move to mixin: */
 
@@ -159,16 +144,6 @@ private:
         else
             return std::string{in};
     }
-
-    static var_io::header parse_header(std::string_view raw_header)
-    {
-        var_io::header ret;
-
-        //TODO implement
-
-        return ret;
-    }
-
 
 public:
 
@@ -190,49 +165,10 @@ public:
         {
             ++file_it;
             std::string_view l = file_it->line;
-            raw_header += l;
-            if (file_format_read == false)
-            {
-                if (l.starts_with("##fileformat="))
-                {
-                    parsed_header.file_format = l.substr(13);
-                    file_format_read = true;
-                }
-                else
-                {
-                    throw format_error{"File does not begin with \"##fileformat\"."};
-                }
-            }
-            else if (l.starts_with("##fileformat="))
-            {
-                throw format_error{"File has two lines that begin with \"##fileformat\"."};
-            }
-            else if (l.starts_with("##INFO="))
-            {
-                //TODO implement
-            }
-            else if (l.starts_with("##FILTER="))
-            {
-                //TODO implement
-            }
-            else if (l.starts_with("##FORMAT="))
-            {
-                //TODO implement
-            }
-            else if (l.starts_with("##contig="))
-            {
-                //TODO implement
-            }
-            else
-            {
-                parsed_header.other_lines.push_back(static_cast<std::string>(l));
-            }
+            header.add_raw_line(l);
         }
 
-        get<field::header>(raw_record)  = raw_header;
-        raw_header_as_bytes             = std::span<std::byte>{reinterpret_cast<std::byte*>(raw_header.data()),
-                                                               raw_header.size()};
-//         parsed_header                   = parse_header(raw_header);
+        get<field::header>(raw_record)  = header.raw_header();
     }
 };
 
