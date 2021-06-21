@@ -8,7 +8,6 @@
 
 /*!\file
  * \brief Provides the seqan3::var_io::tag_dictionary class and auxiliaries.
- * \author Svenja Mehringer <svenja.mehringer AT fu-berlin.de>
  * \author Hannes Hauswedell <hannes.hauswedell AT decode.is>
  */
 
@@ -46,7 +45,7 @@ enum class special_value
  * Alleles in variant files are encoded as one of the following
  *
  *  1. A seqan3::var_io::special_value if missing/absent.
- *  2. A std::vector<seqan3::dna5> if a simple character or sequence of DNA.
+ *  2. A std::vector<seqan3::dna5> if a single character or sequence of DNA.
  *  3. A std::string if they are anything else (imprecise structural variant, breakpoint-string etc).
  */
 using allele = std::variant<special_value, std::vector<dna5>, std::string>;
@@ -238,6 +237,8 @@ private:
 
         if (old_capacity != raw_data.capacity()) // string_views were invalidated
         {
+            std::cerr << "REGENERATING HEADER\n"; // TODO DEBUG
+
             *this = header{std::move(raw_data)}; // regenerate hash-maps
             return true;
         }

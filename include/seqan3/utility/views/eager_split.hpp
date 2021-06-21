@@ -115,15 +115,13 @@ public:
         auto subbegin = subend;
         if (skip_quotes)
         {
-            while (subend < uend)
+            while ((subend < uend) && (in_quote || (*subend != delimiter)))
             {
-                if (*subend == '\"')
-                    in_quote = !in_quote;
-                else if ((!in_quote) && (*subend != delimiter))
-                    break;
+                in_quote ^= (*subend == '\"');
 
                 ++subend;
             }
+            in_quote = false;
         }
         else
         {
