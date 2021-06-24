@@ -73,13 +73,13 @@ private:
 
     /* stuff for turning raw record into parsed record */
     template <field ... field_ids, typename parsed_record_t>
-    void parse_record(tag_t<field_ids...> const & /**/, parsed_record_t & parsed_record) const
+    void parse_record(tag_t<field_ids...> const & /**/, parsed_record_t & parsed_record)
     {
         (to_derived()->parse_field_wrapper(tag<field_ids>, parsed_record), ...);
     }
 
     template <field field_id, typename parsed_record_t>
-    void parse_field_wrapper(tag_t<field_id> const & /**/, parsed_record_t & parsed_record) const
+    void parse_field_wrapper(tag_t<field_id> const & /**/, parsed_record_t & parsed_record)
     {
         if constexpr (parsed_record_t::field_ids::contains(field_id))
         {
@@ -103,7 +103,7 @@ private:
 
     // sane default for handling most sequences and arithmetic fields; override this for special behaviour
     template <field field_id, typename parsed_field_t>
-    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field) const
+    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field)
     {
         std::string_view raw_field = get<field_id>(to_derived()->raw_record);
 

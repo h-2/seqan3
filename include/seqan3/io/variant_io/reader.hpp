@@ -19,6 +19,7 @@
 #include <seqan3/alphabet/cigar/all.hpp>
 #include <seqan3/alphabet/nucleotide/sam_dna16.hpp>
 #include <seqan3/alphabet/quality/phred63.hpp>
+#include <seqan3/io/variant_io/header.hpp>
 #include <seqan3/io/variant_io/misc.hpp>
 #include <seqan3/io/detail/reader_base.hpp>
 #include <seqan3/io/format/format_vcf.hpp>
@@ -31,14 +32,14 @@ namespace seqan3::var_io
 
 //!\brief The default types corresponding to seqan3::var_io::default_field_ids.
 //!\ingroup variant_io
-inline constexpr auto default_field_types = type_tag<std::string, //TOOD int32_t          // field::chrom,
+inline constexpr auto default_field_types = type_tag<int32_t,                             // field::chrom,
                                                      int32_t,                             // field::pos,
                                                      std::string,                         // field::id,
                                                      allele,                              // field::ref,
                                                      std::vector<allele>,                 // field::alt,
                                                      std::vector<seqan3::cigar>,          // field::qual,
-                                                     std::string, //TODO std::vector<uint32_t> // field::filter,
-                                                     std::string, //TODO std::map<uint32_t, variant> // field::info,
+                                                     std::vector<int32_t>,                // field::filter,
+                                                     std::vector<info_entry>,             // field::info,
                                                      std::string,//TODO some dictionary   // field::genotypes,
                                                      header const *>;                     // field::header>;
 

@@ -52,7 +52,7 @@ public:
     //!\brief Value type.
     using value_type            = std::string_view;
     //!\brief Pointer type.
-    using pointer               = std::string_view *;
+    using pointer               = std::string_view const *;
     //!\brief Reference type.
     using reference             = std::string_view;
     //!\brief Iterator category.
@@ -100,10 +100,10 @@ public:
     }
 
     //!\brief Returns pointer to the pointed-to object.
-//     pointer operator->() const noexcept
-//     {
-//         return &subrange;
-//     }
+    pointer operator->() const noexcept
+    {
+        return &subrange;
+    }
     //!\}
 
     /*!\name Iterator operations
