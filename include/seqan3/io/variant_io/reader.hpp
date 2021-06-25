@@ -37,10 +37,10 @@ inline constexpr auto default_field_types = type_tag<int32_t,                   
                                                      std::string,                         // field::id,
                                                      allele,                              // field::ref,
                                                      std::vector<allele>,                 // field::alt,
-                                                     std::vector<seqan3::cigar>,          // field::qual,
+                                                     qual,                                // field::qual,
                                                      std::vector<int32_t>,                // field::filter,
-                                                     std::vector<info_entry>,             // field::info,
-                                                     std::string,//TODO some dictionary   // field::genotypes,
+                                                     std::vector<info_element>,           // field::info,
+                                                     std::vector<genotype_element>,       // field::genotypes,
                                                      header const *>;                     // field::header>;
 
 

@@ -22,6 +22,7 @@
 #include <seqan3/alphabet/views/char_strictly_to.hpp>
 #include <seqan3/alphabet/views/char_to.hpp>
 #include <seqan3/core/range/type_traits.hpp>
+#include <seqan3/core/debug_stream/detail/to_string.hpp>
 #include <seqan3/io/detail/ignore_output_iterator.hpp>
 #include <seqan3/io/detail/misc.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
@@ -59,6 +60,16 @@ private:
     size_t           last_chrom_index = -1;
     size_t           line = 0;
 
+
+
+    [[noreturn]] void error(auto const & ... messages)
+    {
+        std::string message = "[SeqAn3 VCF format error in line " + detail::to_string(line) + "]";
+        message += detail::to_string(messages...);
+
+        throw format_error{message};
+    }
+
     void read_raw_record()
     {
         ++line;
@@ -84,6 +95,7 @@ private:
     }
 
 
+
     /* OPTIONS */
 
     bool warn_on_missing_header_entries = false;
@@ -91,17 +103,10 @@ private:
     /* PARSED RECORD HANDLING */
     var_io::header header;
 
-    // override the general case to handle MISSING value
-//     template <field field_id, typename parsed_field_t>
-//     void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field) const
-//     {
-//         if (get<field_id>(raw_record) != var_io::special_value::missing)
-//             static_cast<base_t const &>(*this).parse_field(tag<field_id>, parsed_field);
-//     }
-
+    //!\brief Default field handlers.
     using base_t::parse_field;
 
-    // Reading chrom as number means getting the index (not converting string to number)
+    //!\brief Parse the CHROM field. Reading chrom as number means getting the index (not converting string to number).
     template <std::integral parsed_field_t>
     void parse_field(tag_t<field::chrom> const & /**/,  parsed_field_t & parsed_field)
     {
@@ -136,12 +141,20 @@ private:
         }
     }
 
-    /* pos + id are handled correctly by default */
+    /* pos is handled correctly by default */
+
+    //!\brief Read ID as string, but read "." as empty string.
+    template <typename parsed_field_t>
+    void parse_field(tag_t<field::id> const & /**/, parsed_field_t & parsed_field)
+    {
+        if (get<field::id>(raw_record) != ".") // dot means empty, otherwise delegate to base
+            static_cast<base_t &>(*this).parse_field(tag<field::id>, parsed_field);
+    }
 
     //!\brief Overload for parsing REF.
     void parse_field(tag_t<field::ref> const & /**/, var_io::allele & parsed_field)
     {
-        std::string_view raw_field = get<field::alt>(raw_record);
+        std::string_view raw_field = get<field::ref>(raw_record);
         parsed_field = parse_allele_impl(raw_field);
     }
 
@@ -160,7 +173,7 @@ private:
     void parse_field(tag_t<field::qual> const & /**/,
                      std::variant<var_io::special_value, parsed_field_t> & parsed_field)
     {
-        std::string_view raw_field = get<field::alt>(raw_record);
+        std::string_view raw_field = get<field::qual>(raw_record);
 
         if (raw_field == ".")
         {
@@ -173,14 +186,14 @@ private:
         else
         {
             parsed_field = parsed_field_t{};
-            static_cast<base_t const &>(*this).parse_field(tag<field::filter>, *parsed_field); // arithmetic parsing
+            static_cast<base_t &>(*this).parse_field(tag<field::qual>, std::get<1>(parsed_field)); // arithmetic parsing
         }
     }
 
     //!\brief Overload for parsing FILTER as strings.
     void parse_field(tag_t<field::filter> const & /**/, std::vector<std::string> & parsed_field)
     {
-        std::string_view raw_field = get<field::alt>(raw_record);
+        std::string_view raw_field = get<field::filter>(raw_record);
 
         if (raw_field == ".")
             return;
@@ -193,7 +206,7 @@ private:
     template <std::integral parsed_field_t>
     void parse_field(tag_t<field::filter> const & /**/,  std::vector<parsed_field_t> & parsed_field)
     {
-        std::string_view raw_field = get<field::alt>(raw_record);
+        std::string_view raw_field = get<field::filter>(raw_record);
 
         if (raw_field == ".")
             return;
@@ -228,7 +241,7 @@ private:
                       (std::same_as<key_t, std::string> && std::same_as<value_t, std::string>),
                       "Unsupported key/value types for reading INFO field. See documentation of var_io::reader.");
 
-        std::string_view raw_field = get<field::alt>(raw_record);
+        std::string_view raw_field = get<field::info>(raw_record);
 
         if (raw_field == ".")
             return;
@@ -243,10 +256,7 @@ private:
             auto post_it = std::ranges::next(val_it);
 
             if (key_it == key_value_view.end() || (val_it != key_value_view.end() && post_it != key_value_view.end()))
-            {
-                throw format_error{std::string{"Could not read INFO fields from the following string: "} +
-                                   std::string{subfield}};
-            }
+                error("Could not read INFO fields from the following string: ", subfield);
 
             std::string_view key = *key_it;
             if constexpr (std::same_as<key_t, int32_t>)
@@ -299,9 +309,7 @@ private:
                     if (header.parsed_header().infos.back().type != io_type_id::flag ||
                         header.parsed_header().infos.back().number != 0)
                     {
-                        throw format_error{std::string{"INFO field \""} + std::string{key} + "\" on line " +
-                                            std::to_string(line) + " is not a flag and should come with a value -- "
-                                            "but does not."};
+                        error("INFO field \"", key, "\" is not a flag and should come with a value -- but does not.");
                     }
 
                     ret.second = true; // set variant to boolean/flag state
@@ -312,10 +320,20 @@ private:
             {
                 if constexpr (std::same_as<value_t, io_type_variant>)
                 {
-                    detail::parse_io_type_variant(header.parsed_header().infos[ret.first].type,
-                                                  *val_it,
-                                                  ret.second);
-                    //TODO verify number and warn if different from header
+                    size_t num_val = detail::parse_io_type_variant(header.parsed_header().infos[ret.first].type,
+                                                                   *val_it,
+                                                                   ret.second);
+                    if (size_t exp_val = header.parsed_header().infos[ret.first].number;
+                        warn_on_missing_header_entries && num_val != exp_val)
+                    {
+                        debug_stream << "[seqan3::var_io::warning] Expected to find "
+                                     << exp_val
+                                     << "values for the INFO field "
+                                     << raw_field
+                                     << "but found: "
+                                     << num_val
+                                     << "\n";
+                    }
                 }
                 else // val_t == std::string
                 {
@@ -327,12 +345,36 @@ private:
         }
     }
 
-    template <typename parsed_field_t>
-    void parse_field(tag_t<field::genotypes> const & /**/, parsed_field_t & parsed_field)
+    void parse_field(tag_t<field::genotypes> const & /**/, std::vector<genotype_element> & parsed_field)
     {
-        if ((*file_it).fields.size() > 10) // there are optional fields
+        size_t column_number          = file_it->fields.size();
+        size_t expected_column_number = header.parsed_header().samples.count() + 8;
+
+        if (column_number > 8) // there are genotypes
         {
-            // TODO store into dictionary
+            if (column_number != expected_column_number)
+                error("Expected ", expected_column_number, " columns in line but found", column_number, ".");
+
+            std::string_view format_names = file_it->fields[8];
+
+            for (std::string_view format_name : format_names | views::eager_split(':'))
+            {
+                size_t format_index = -1;
+                if (auto it = header.parsed_header().format_id_to_index.find(format_name);
+                    it == header.parsed_header().format_id_to_index.end()) // format name was not in header, insert!
+                {
+                    //TODO
+                }
+                else
+                {
+                    format_index = it->second;
+                }
+
+                header::format_t format const & header.parsed_header().formats[format_index];
+
+                auto resize = [s = header.parsed_header().samples.count()] (auto & vec) { vec.resize(s); };
+
+
         }
     }
 

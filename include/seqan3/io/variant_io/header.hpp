@@ -102,6 +102,7 @@ public:
     struct parsed_data_t
     {
         std::string_view                             file_format;           //!< The file format version.
+
         std::vector<contig_t>                        contigs;               //!< Header lines describing contigs.
         std::unordered_map<std::string_view, size_t> contig_id_to_index;    //!< ID-string to position in #contigs.
         std::vector<info_t>                          infos;                 //!< Header lines describing INFO fields.
@@ -110,6 +111,8 @@ public:
         std::unordered_map<std::string_view, size_t> filter_id_to_index;    //!< ID-string to position in #filters.
         std::vector<format_t>                        formats;               //!< Header lines describing FORMAT fields.
         std::unordered_map<std::string_view, size_t> format_id_to_index;    //!< ID-string to position in #formats.
+
+        std::vector<std::string_view>                samples;               //!< IDs of samples (genotyping).
         std::vector<std::string_view>                other_lines;           //!< Any other lines in the header.
     };
 
@@ -282,11 +285,6 @@ private:
         }
     }
 
-//     void unparse_file_format(std::string_view new_value)
-//     {
-//         append_to_header(std::string_view{"##fileformat="}, new_value);
-//     }
-
     void unparse_contig(contig_t const & contig)
     {
         std::vector<std::string_view> strings;
@@ -394,7 +392,7 @@ private:
         if (type.empty())
             throw format_error{"INFO or FORMAT line does not contain Type field."};
         else
-            new_info.type = parse_type(type.mapped());
+            new_info.type = parse_type(type.mapped(), new_info.number);
 
         /* Description */
         auto description = new_info.other_fields.extract("Description");
@@ -477,13 +475,7 @@ private:
         {
             int64_t ret = -1;
             std::string_view s = length.mapped();
-
-            if (auto tmp = std::from_chars(s.data(), s.data() + s.size(), ret);
-                tmp.ec != std::errc{} || tmp.ptr != s.data() + s.size())
-            {
-                throw format_error{std::string{"Cannot convert the following string to a number: "} + std::string{s}};
-            }
-
+            detail::string_to_number(s, ret);
             new_contig.length = ret;
         }
 
@@ -494,14 +486,14 @@ private:
         parsed_data.contigs.push_back(std::move(new_contig));
     }
 
-    static inline std::string_view strip_angular_brackets(std::string_view in)
+    static inline std::string_view strip_angular_brackets(std::string_view const in)
     {
         if (in.size() < 2 || in.front() != '<' || in.back() != '>')
             throw format_error{"Structured line does not contain \"<\" and \">\" at right places."};
         return in.substr(1, in.size() - 2);
     }
 
-    static int32_t parse_number(std::string_view in)
+    static int32_t parse_number(std::string_view const in)
     {
 
         switch (in[0])
@@ -513,41 +505,55 @@ private:
             default:
             {
                 int32_t ret = 0;
-                auto tmp = std::from_chars(in.data(), in.data() + in.size(), ret);
-                if (tmp.ec != std::errc{} || tmp.ptr != in.data() + in.size())
-                {
-                    throw format_error{std::string{"Cannot convert the following string to a number: "} +
-                                       std::string{in}};
-                }
+                detail::string_to_number(in, ret);
                 return ret;
             }
         }
         return header_number::dot;
     }
 
-    static io_type_id parse_type(std::string_view in)
+    static io_type_id parse_type(std::string_view const in, int32_t const number)
     {
         io_type_id ret{};
 
+        if (in == "Flag")
+        {
+            ret = io_type_id::flag;
+            if (number != 0)
+                throw format_error{std::string{"Flags must always have number 0 in header."}};
+            return ret;
+        }
+
+        if (number == 0)
+            throw format_error{std::string{"Only flags may have number 0 in header."}};
+
         if (in == "Integer")
         {
-            ret = io_type_id::int32;
+            if (number == 1)
+                ret = io_type_id::int32;
+            else
+                ret = io_type_id::vector_of_int32;
         }
         else if (in == "Float")
         {
-            ret = io_type_id::float32;
-        }
-        else if (in == "Flag")
-        {
-            ret = io_type_id::flag;
+            if (number == 1)
+                ret = io_type_id::float32;
+            else
+                ret = io_type_id::vector_of_float32;
         }
         else if (in == "Character")
         {
-            ret = io_type_id::char8;
+            if (number == 1)
+                ret = io_type_id::char8;
+            else
+                ret = io_type_id::vector_of_char8;
         }
         else if (in == "String")
         {
-            ret = io_type_id::string;
+            if (number == 1)
+                ret = io_type_id::string;
+            else
+                ret = io_type_id::vector_of_string;
         }
         else
         {
