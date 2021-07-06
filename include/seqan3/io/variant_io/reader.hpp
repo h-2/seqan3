@@ -30,19 +30,52 @@
 namespace seqan3::var_io
 {
 
-//!\brief The default types corresponding to seqan3::var_io::default_field_ids.
-//!\ingroup variant_io
-inline constexpr auto default_field_types = type_tag<int32_t,                             // field::chrom,
+/*!\brief Shallow field types for variant io.
+ *!\ingroup variant_io
+ *
+ * \details
+ *
+ * These traits define a record type with minimal memory allocations. It is the recommended record type when
+ * streaming over the input file.
+ *
+ * Where possible numeric IDs are used (BCF-style).
+ *
+ * \warning Shallow types
+ *
+ * These records are not self-contained, i.e. they depend on caches and will become invalid when the file
+ * is moved to the next record.
+ * Since some elements in the record are views, it may not be trivial to change all values.
+ */
+inline constexpr auto shallow_field_types = type_tag<int32_t,                             // field::chrom,
                                                      int32_t,                             // field::pos,
-                                                     std::string,                         // field::id,
-                                                     allele,                              // field::ref,
-                                                     std::vector<allele>,                 // field::alt,
-                                                     qual,                                // field::qual,
+                                                     std::string_view,                    // field::id,
+                                                     decltype(std::string_view{} | views::char_to<seqan3::dna5>),// field::ref,
+                                                     std::vector<std::string_view>,       // field::alt,
+                                                     float,                               // field::qual,
                                                      std::vector<int32_t>,                // field::filter,
-                                                     std::vector<info_element>,           // field::info,
-                                                     std::vector<genotype_element>,       // field::genotypes,
+                                                     std::vector<info_element<true>>,     // field::info,
+                                                     std::vector<genotype_element<true>>, // field::genotypes,
+//                                                      std::string_view, // field::genotypes,
                                                      header const *>;                     // field::header>;
 
+
+/*!\brief Deep field types for variant io.
+ *!\ingroup variant_io
+ *
+ * \details
+ *
+ * TODO
+ */
+inline constexpr auto    deep_field_types = type_tag<int32_t,                             // field::chrom,
+                                                     int32_t,                             // field::pos,
+                                                     std::string,                         // field::id,
+                                                     std::vector<seqan3::dna5>,           // field::ref,
+                                                     std::vector<std::string>,            // field::alt,
+                                                     float,                               // field::qual,
+                                                     std::vector<int32_t>,                // field::filter,
+                                                     std::vector<info_element<false>>,    // field::info,
+                                                     std::vector<genotype_element<false>>,// field::genotypes,
+                                                     header const *>;
 
 //!\brief Every field is configured as a std::span of std::byte (this enables "raw" io).
 //!\ingroup variant_io
@@ -65,7 +98,7 @@ inline constexpr auto string_field_types = list_traits::repeat<default_field_ids
  * TODO describe how to easily initialise this
  */
 template <typename field_ids_t = decltype(default_field_ids),
-          typename field_types_t = decltype(default_field_types),
+          typename field_types_t = decltype(shallow_field_types),
           typename formats_t = type_list<format_vcf>>
 struct reader_options
 {

@@ -26,55 +26,34 @@
 namespace seqan3::var_io
 {
 
-//!\brief An enumerator denoting field special states in a variant file.
-//!\ingroup variant_io
-enum class special_value
-{
-    missing,    //!< "."
-    unknown,    //!< "*"
-};
+template <typename t>
+inline t missing_value = t{};
 
 
-constexpr bool is_missing(char const c)
-{
-    return c == '.';
-}
+template <>
+inline std::string missing_value<std::string> = "*";
 
-constexpr bool is_missing(std::string_view const s)
-{
-    return s == ".";
-}
+template <>
+inline constexpr std::string_view missing_value<std::string_view> = "*";
+
 
 template <typename int_t>
     requires (std::same_as<int_t, int8_t> || std::same_as<int_t, int16_t> || std::same_as<int_t, int32_t>)
-constexpr bool is_missing(int8_t const i)
+inline constexpr int_t missing_value<int_t> = std::numeric_limits<int_t>::lowest();
+
+template <>
+inline float missing_value<float> = [] ()
 {
-    return i == std::numeric_limits<int_t>::lowest();
-}
+    uint32_t i = 0x7F800001U;
+    return *reinterpret_cast<float*>(&i);
+} ();
 
-
-/*!\brief A type representing variant file alleles.
- * \ingroup variant_io
- *
- * \details
- *
- * Alleles in variant files are encoded as one of the following
- *
- *  1. A seqan3::var_io::special_value if missing/absent.
- *  2. A std::vector<seqan3::dna5> if a single character or sequence of DNA.
- *  3. A std::string if they are anything else (imprecise structural variant, breakpoint-string etc).
- */
-using allele = std::variant<special_value, std::vector<dna5>, std::string>;
 
 /*!\brief A type representing an variant file INFO field [index of the INFO in header, value].
  * \ingroup variant_io
  */
-using info_element = std::pair<int32_t, io_type_variant>;
-
-/*!\brief A type representing an variant file QUAL field [missing or a float value].
- * \ingroup variant_io
- */
-using qual = std::variant<special_value, float>;
+template <bool shallow = true>
+using info_element = std::pair<int32_t, io_type_variant<shallow>>;
 
 /*!\brief A type representing an genotype.
  * \ingroup variant_io
@@ -97,7 +76,8 @@ using qual = std::variant<special_value, float>;
  * will be set to the missing value (see seqan3::var_io::is_missing()) or be the empty vector (in case the element type
  * is a vector).
  */
-using genotype_element = std::pair<int32_t, io_type_vector_variant>;
+template <bool shallow = true>
+using genotype_element = std::pair<int32_t, io_type_vector_variant<shallow>>;
 
 //!\brief Default fields for seqan3::var_io::reader_options.
 //!\ingroup variant_io
@@ -114,15 +94,78 @@ inline constexpr auto default_field_ids = tag<field::chrom,
 
 } // namespace seqan3::var_io
 
-namespace seqan3
+
+namespace seqan3::detail
 {
 
-template <typename char_t, typename special_value_t>
-    requires std::same_as<std::remove_cvref_t<special_value_t>, var_io::special_value>
-inline debug_stream_type<char_t> & operator<<(debug_stream_type<char_t> & s, special_value_t && v)
+struct parse_io_type_data_t
 {
-    s << (v == var_io::special_value::missing ? '.' : '*');
-    return s;
+    std::string_view input;
+    static constexpr std::string_view missing = ".";
+
+    constexpr size_t operator()(bool & output) const
+    {
+        output = true;
+        return 0;
+    }
+
+    constexpr size_t operator()(char & output) const
+    {
+        assert(input.size() == 1);
+        output = input[0];
+        return 1;
+    }
+
+    template <arithmetic arith_t>
+    inline size_t operator()(arith_t & output) const
+    {
+        if (input == missing)
+            output = var_io::missing_value<arith_t>;
+        else
+            string_to_number(input, output);
+        return 1;
+    }
+
+    inline size_t operator()(std::string & output) const
+    {
+        if (input != missing)
+            output = std::string{input};
+        return 1;
+    }
+
+    inline size_t operator()(std::string_view & output) const
+    {
+        output = input;
+        return 1;
+    }
+
+    template <typename elem_t>
+    //TODO back_insertable
+    inline size_t operator()(std::vector<elem_t> & vec) const
+    {
+        for (std::string_view s : input | views::eager_split(','))
+        {
+            vec.emplace_back();
+            parse_io_type_data_t{s}(vec.back());
+        }
+
+        return vec.size();
+    }
+};
+
+/*!\brief Create an seqan3::io_type_variant from a string and a known seqan3::io_type_id.
+ * \ingroup io
+ * \param[in]  id           ID of the type that shall be read.
+ * \param[in]  input_string The string data to read from.
+ * \param[out] output       The object to store the result in.
+ * \returns The number of elements stored in the output in case ID is one of the "vector_of_"-types; 1 otherwise.
+ */
+inline size_t parse_io_type_variant(io_type_id const id,
+                                    std::string_view const input_string,
+                                    is_io_type_variant auto & output)
+{
+    init_io_type_variant(id, output);
+    return std::visit(parse_io_type_data_t{input_string}, output);
 }
 
-} // namespace seqan3
+} // namespace seqan3::detail

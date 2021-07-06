@@ -21,6 +21,10 @@
 namespace seqan3
 {
 
+
+template <typename t, typename ... ts>
+concept is_one_of = (std::same_as<t, ts> || ...);
+
 template <auto ... more_vs>
 struct tag_t
 {
@@ -104,11 +108,12 @@ enum class io_type_id
 };
 
 //!\brief Variant to handle "dynamic typing" in alignment map IO and variant IO.
-using io_type_variant = std::variant<bool,                      // var_io only
+template <bool shallow = true>
+using io_type_variant = std::variant<int8_t,                    // var_io only
                                      char,                      // am_io only
                                      int32_t,
                                      float,
-                                     std::string,
+                                     std::conditional_t<shallow, std::string_view, std::string>,
                                      std::vector<char>,         // var_io only
                                      std::vector<int8_t>,       // am_io only
                                      std::vector<uint8_t>,      // am_io only
@@ -117,13 +122,14 @@ using io_type_variant = std::variant<bool,                      // var_io only
                                      std::vector<int32_t>,
                                      std::vector<uint32_t>,     // am_io only
                                      std::vector<float>,
-                                     std::vector<std::string>>; // var_io only
+                                     std::vector<std::conditional_t<shallow, std::string_view, std::string>>>; // var_io only
 
-using io_type_vector_variant = std::variant<std::vector<bool>,                      // var_io only
+template <bool shallow = true>
+using io_type_vector_variant = std::variant<std::vector<int8_t>,                    // var_io only
                                             std::vector<char>,                      // am_io only
                                             std::vector<int32_t>,
                                             std::vector<float>,
-                                            std::vector<std::string>,
+                                            std::vector<std::conditional_t<shallow, std::string_view, std::string>>,
                                             std::vector<std::vector<char>>,         // var_io only
                                             std::vector<std::vector<int8_t>>,       // am_io only
                                             std::vector<std::vector<uint8_t>>,      // am_io only
@@ -132,7 +138,7 @@ using io_type_vector_variant = std::variant<std::vector<bool>,                  
                                             std::vector<std::vector<int32_t>>,
                                             std::vector<std::vector<uint32_t>>,     // am_io only
                                             std::vector<std::vector<float>>,
-                                            std::vector<std::vector<std::string>>>; // var_io only
+                                            std::vector<std::vector<std::conditional_t<shallow, std::string_view, std::string>>>>; // var_io only
 
 
 } // namespace seqan3
@@ -147,151 +153,103 @@ void string_to_number(std::string_view input, arithmetic auto & number)
         throw std::runtime_error{std::string{"Could not convert \""} + std::string{input} + "\" into a number."};
 }
 
-inline void init_io_type_variant(io_type_id const id, io_type_variant & output)
+template <typename t>
+concept is_io_type_variant = is_one_of<t, io_type_variant<true>, io_type_variant<false>>;
+
+template <typename t>
+concept is_io_type_vector_variant = is_one_of<t, io_type_vector_variant<true>, io_type_vector_variant<false>>;
+
+template <typename t>
+    requires is_io_type_variant<t> || is_io_type_vector_variant<t>
+inline void init_io_type_variant(io_type_id const id_, t & output)
 {
-    switch (id)
+    switch (id_)
     {
         case io_type_id::flag:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::flag);
-            output.emplace<id>(true);
+            output.template emplace<id>();
             return;
         }
         case io_type_id::char8:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::char8);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::int32:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::int32);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::float32:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::float32);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::string:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::string);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_char8:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_char8);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_int8:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_int8);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_uint8:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_uint8);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_int16:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_int16);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_uint16:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_uint16);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_int32:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_int32);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_uint32:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_uint32);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_float32:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_float32);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
         case io_type_id::vector_of_string:
         {
             constexpr size_t id = static_cast<size_t>(io_type_id::vector_of_string);
-            output.emplace<id>();
+            output.template emplace<id>();
             return;
         }
     }
 }
-
-struct parse_io_type_data_t
-{
-    std::string_view input;
-
-    constexpr size_t operator()(bool & output) const
-    {
-        output = true;
-        return 0;
-    }
-
-    constexpr size_t operator()(char & output) const
-    {
-        assert(input.size() == 1);
-        output = s[0];
-        return 1;
-    }
-
-    inline size_t operator()(arithmetic auto & output) const
-    {
-        string_to_number(input, output);
-        return 1;
-    }
-
-    inline size_t operator()(std::string & output) const
-    {
-        output = std::string{input};
-        return 1;
-    }
-
-    template <typename elem_t>
-    inline size_t operator()(std::vector<elem_t> & vec) const
-    {
-        for (std::string_view s : input | views::eager_split(','))
-        {
-            vec.emplace_back();
-            parse_io_type_data_t{s}(vec.back());
-        }
-
-        return vec.size();
-    }
-};
-
-/*!\brief Create an seqan3::io_type_variant from a string and a known seqan3::io_type_id.
- * \ingroup io
- * \param[in]  id           ID of the type that shall be read.
- * \param[in]  input_string The string data to read from.
- * \param[out] output       The object to store the result in.
- * \returns The number of elements stored in the output in case ID is one of the "vector_of_"-types; 1 otherwise.
- */
-inline size_t parse_io_type_variant(io_type_id const id, std::string_view input_string, io_type_variant & output)
-{
-    init_io_type_variant(id, output);
-    std::visit(parse_io_type_data_t{input_string}, output);
-}
-
 
 } // namespace seqan3::detail

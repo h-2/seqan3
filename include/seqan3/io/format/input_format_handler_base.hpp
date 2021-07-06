@@ -72,81 +72,110 @@ private:
 
 
     /* stuff for turning raw record into parsed record */
-    template <field ... field_ids, typename parsed_record_t>
-    void parse_record(tag_t<field_ids...> const & /**/, parsed_record_t & parsed_record)
+
+    /*!\name Parsing individual fields - defaults (step 3)
+     * \{
+     */
+    //!\brief Not parsing at all / *raw IO*.
+    static void parse_field_impl(std::string_view const in, std::span<std::byte> & parsed_field)
     {
-        (to_derived()->parse_field_wrapper(tag<field_ids>, parsed_record), ...);
+        parsed_field = std::span<std::byte>{reinterpret_cast<std::byte*>(in.data()), in.size()};
     }
 
-    template <field field_id, typename parsed_record_t>
-    void parse_field_wrapper(tag_t<field_id> const & /**/, parsed_record_t & parsed_record)
+    //!\brief Parsing into string views. NOTE: binary formats may want to = delete override this.
+    static void parse_field_impl(std::string_view const in, std::string_view & parsed_field)
     {
-        if constexpr (parsed_record_t::field_ids::contains(field_id))
-        {
-            std::string_view raw_field = get<field_id>(to_derived()->raw_record);
-            auto & parsed_field        = get<field_id>(parsed_record);
-
-            using parsed_field_t = std::remove_reference_t<decltype(parsed_field)>;
-
-            if constexpr (std::same_as<parsed_field_t, std::span<std::byte>>)
-            {
-                parsed_field = std::span<std::byte>{reinterpret_cast<std::byte*>(raw_field.data()),
-                                                    raw_field.size()};
-            }
-            else
-            {
-                to_derived()->parse_field(tag<field_id>, parsed_field);
-            }
-        }
-        // fields that are not in format or not in target record are simply ignored
+        parsed_field = in;
     }
 
-    // sane default for handling most sequences and arithmetic fields; override this for special behaviour
-    template <field field_id, typename parsed_field_t>
-    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field)
+    //!\brief Parsing into transformed string views. NOTE: binary formats may want to = delete override this.
+    template <typename fun_t>
+    static void parse_field_impl(std::string_view const in,
+                                 std::ranges::transform_view<std::string_view, fun_t> & parsed_field)
     {
-        std::string_view raw_field = get<field_id>(to_derived()->raw_record);
+        parsed_field = std::ranges::transform_view<std::string_view, fun_t>{in, fun_t{}};
+    }
 
-        if constexpr (std::ranges::range<parsed_field_t>) //TODO output_range
-        {
-            using target_alph_type = std::ranges::range_value_t<parsed_field_t>;
+    //!\brief Parse into string-like types.
+    template <typename parsed_field_t>
+        requires std::ranges::range<parsed_field_t> &&
+                 detail::back_insertable_with<parsed_field_t, char>
+    static void parse_field_impl(std::string_view const in, parsed_field_t & parsed_field)
+    {
+//         auto adaptor = detail::get_or_view_all<field_id>(to_derived());
+//         detail::sized_range_copy(raw_field | adaptor, parsed_field);
+        detail::sized_range_copy(in, parsed_field);
+    }
 
-            auto adaptor = detail::get_or_view_all<field_id>(to_derived());
+    //!\brief Parse into containers of alphabets.
+    template <typename parsed_field_t>
+        requires (std::ranges::range<parsed_field_t> &&
+                  !detail::back_insertable_with<parsed_field_t, char> &&
+                  alphabet<std::ranges::range_reference_t<parsed_field_t>> &&
+                  detail::back_insertable_with<parsed_field_t, std::ranges::range_reference_t<parsed_field_t>>)
+    static void parse_field_impl(std::string_view const in, parsed_field_t & parsed_field)
+    {
+        using target_alph_type = std::ranges::range_value_t<parsed_field_t>;
+        detail::sized_range_copy(in | views::char_strictly_to<target_alph_type>,
+                                 parsed_field);
+//         auto adaptor = detail::get_or_view_all<field_id>(to_derived());
+//         detail::sized_range_copy(raw_field | adaptor | views::char_strictly_to<target_alph_type,
+//                                  parsed_field);
+    }
 
-            if constexpr (std::constructible_from<target_alph_type, char>) // no alphabet conversion
-            {
-                detail::sized_range_copy(raw_field | adaptor,
-                                         parsed_field);
-            }
-            else if constexpr (alphabet<target_alph_type>)
-            {
-                detail::sized_range_copy(raw_field | adaptor | views::char_strictly_to<target_alph_type>,
-                                         parsed_field);
-            }
-            else
-            {
-                static_assert(arithmetic<parsed_field_t>/*always false*/,
-                          "Format X does not know how to convert field Y into type Z. Provide different traits or a "
-                          "custom format handler.");
-                //TODO replace X Y and Z with actual strings generated from types.
-            }
-        }
-        else if constexpr (arithmetic<parsed_field_t>)
-        {
-            if (auto r = std::from_chars(raw_field.data(), raw_field.data() + raw_field.size(), parsed_field);
-                r.ec != std::errc{})
-            {
-                throw format_error{std::string{"Failed to convert \""} + std::string{raw_field} + "\" into a number."};
-            }
-        }
-        else
-        {
+
+    //!\brief Parse into a a numerical type
+    template <typename parsed_field_t>
+        requires arithmetic<parsed_field_t>
+    static void parse_field_impl(std::string_view const in, parsed_field_t & parsed_field)
+    {
+        detail::string_to_number(in, parsed_field);
+    }
+    //!\}
+
+    /*!\name Parsing individual fields (step 2)
+     * \{
+     */
+    //!\brief Default is no handler.
+    template <typename tag_type, typename parsed_field_t>
+    void parse_field(tag_type const & /**/, parsed_field_t & parsed_field)
+    {
             static_assert(arithmetic<parsed_field_t>/*always false*/,
                           "Format X does not know how to convert field Y into type Z. Provide different traits or a "
                           "custom format handler.");
             //TODO replace X Y and Z with actual strings generated from types.
-        }
     }
+
+    //!\brief Various target types have sane default implementations.
+    template <field field_id, typename parsed_field_t>
+    void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field)
+        requires (requires { derived_t::parse_field_impl(std::string_view{}, parsed_field); })
+    {
+        to_derived()->parse_field_impl(get<field_id>(to_derived()->raw_record), parsed_field);
+    }
+    //!\}
+
+    /*!\name Parsing record (step 1)
+     * \{
+     */
+    template <field field_id, typename parsed_record_t>
+    void parse_record_impl(tag_t<field_id> const & /**/, parsed_record_t & parsed_record)
+    {
+        if constexpr (parsed_record_t::field_ids::contains(field_id))
+        {
+            auto & parsed_field = get<field_id>(parsed_record);
+            to_derived()->parse_field(tag<field_id>, parsed_field);
+
+        }
+        // fields that are not in format or not in target record are simply ignored
+    }
+
+    template <field ... field_ids, typename parsed_record_t>
+    void parse_record(tag_t<field_ids...> const & /**/, parsed_record_t & parsed_record)
+    {
+        (to_derived()->parse_record_impl(tag<field_ids>, parsed_record), ...);
+    }
+    //!\}
 
 
     // private to prevent wrong derivation

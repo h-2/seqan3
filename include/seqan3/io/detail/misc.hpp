@@ -25,15 +25,25 @@
 namespace seqan3::detail
 {
 
+template <typename rng_t, typename val_t>
+SEQAN3_CONCEPT back_insertable_with =
+    std::ranges::output_range<rng_t, val_t> &&
+    requires (rng_t & v) { v.push_back(std::declval<val_t>()); };
+
+template <typename rng_t>
+SEQAN3_CONCEPT back_insertable =
+    std::ranges::input_range<rng_t> &&
+    back_insertable_with<rng_t, std::ranges::range_reference_t<rng_t>>;
+
 template <std::ranges::input_range in_t,
-          std::ranges::output_range<std::ranges::range_reference_t<in_t>> out_t>
+          back_insertable_with<std::ranges::range_reference_t<in_t>> out_t>
 void sized_range_copy(in_t && in, out_t && out)
 {
     std::ranges::copy(in, std::cpp20::back_inserter(out));
 }
 
 template <std::ranges::input_range in_t,
-          std::ranges::output_range<std::ranges::range_reference_t<in_t>> out_t>
+          back_insertable_with<std::ranges::range_reference_t<in_t>> out_t>
     requires std::ranges::sized_range<in_t> && requires (out_t out) { out.resize(0); }
 void sized_range_copy(in_t && in, out_t && out)
 {

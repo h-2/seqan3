@@ -105,6 +105,7 @@ private:
 
     //!\brief Default field handlers.
     using base_t::parse_field;
+    using base_t::parse_field_impl;
 
     //!\brief Parse the CHROM field. Reading chrom as number means getting the index (not converting string to number).
     template <std::integral parsed_field_t>
@@ -141,71 +142,64 @@ private:
         }
     }
 
-    /* pos is handled correctly by default */
-
-    //!\brief Read ID as string, but read "." as empty string.
-    template <typename parsed_field_t>
-    void parse_field(tag_t<field::id> const & /**/, parsed_field_t & parsed_field)
-    {
-        if (get<field::id>(raw_record) != ".") // dot means empty, otherwise delegate to base
-            static_cast<base_t &>(*this).parse_field(tag<field::id>, parsed_field);
-    }
-
-    //!\brief Overload for parsing REF.
-    void parse_field(tag_t<field::ref> const & /**/, var_io::allele & parsed_field)
-    {
-        std::string_view raw_field = get<field::ref>(raw_record);
-        parsed_field = parse_allele_impl(raw_field);
-    }
+    /* POS, ID, REF are handled correctly by default */
 
     //!\brief Overload for parsing ALT.
-    // TODO: make this back_insertable instead vector
-    void parse_field(tag_t<field::alt> const & /**/, std::vector<var_io::allele> & parsed_field)
+    template <typename parsed_field_t>
+        requires detail::back_insertable<parsed_field_t> &&
+                 std::ranges::range<std::ranges::range_reference_t<parsed_field_t>>
+    void parse_field(tag_t<field::alt> const & /**/, parsed_field_t & parsed_field)
     {
         std::string_view raw_field = get<field::alt>(raw_record);
 
         for (std::string_view subfield : raw_field | views::eager_split(','))
-            parsed_field.push_back(parse_allele_impl(subfield));
+        {
+            parsed_field.emplace_back();
+            // delegate parsing of element to base
+            parse_field_impl(subfield, parsed_field.back());
+        }
     }
 
     //!\brief Overload for parsing QUAL.
     template <arithmetic parsed_field_t>
-    void parse_field(tag_t<field::qual> const & /**/,
-                     std::variant<var_io::special_value, parsed_field_t> & parsed_field)
+    void parse_field(tag_t<field::qual> const & /**/, parsed_field_t & parsed_field)
     {
         std::string_view raw_field = get<field::qual>(raw_record);
 
         if (raw_field == ".")
         {
-            parsed_field = var_io::special_value::missing;
-        }
-        else if (raw_field == "*")
-        {
-            parsed_field = var_io::special_value::unknown;
+            parsed_field = var_io::missing_value<parsed_field_t>;
         }
         else
         {
             parsed_field = parsed_field_t{};
-            static_cast<base_t &>(*this).parse_field(tag<field::qual>, std::get<1>(parsed_field)); // arithmetic parsing
+            parse_field_impl(raw_field, parsed_field); // arithmetic parsing
         }
     }
 
     //!\brief Overload for parsing FILTER as strings.
-    void parse_field(tag_t<field::filter> const & /**/, std::vector<std::string> & parsed_field)
+    template <typename parsed_field_t>
+        requires (detail::back_insertable<parsed_field_t> &&
+                  is_one_of<std::ranges::range_reference_t<parsed_field_t>, std::string, std::string_view>)
+    void parse_field(tag_t<field::filter> const & /**/, parsed_field_t & parsed_field)
     {
+        using elem_t = std::ranges::range_reference_t<parsed_field_t>;
         std::string_view raw_field = get<field::filter>(raw_record);
 
         if (raw_field == ".")
             return;
 
         for (std::string_view subfield : raw_field | views::eager_split(';'))
-            parsed_field.push_back(std::string{subfield});
+            parsed_field.push_back(elem_t{subfield});
     }
 
     //!\brief Overload for parsing FILTER as indexes.
-    template <std::integral parsed_field_t>
-    void parse_field(tag_t<field::filter> const & /**/,  std::vector<parsed_field_t> & parsed_field)
+    template <typename parsed_field_t>
+    requires (detail::back_insertable<parsed_field_t> &&
+              std::integral<std::ranges::range_reference_t<parsed_field_t>>)
+    void parse_field(tag_t<field::filter> const & /**/, parsed_field_t & parsed_field)
     {
+        using elem_t = std::ranges::range_reference_t<parsed_field_t>;
         std::string_view raw_field = get<field::filter>(raw_record);
 
         if (raw_field == ".")
@@ -217,7 +211,7 @@ private:
                      it == header.parsed_header().filter_id_to_index.end()) // filter name was not in header, insert!
             {
                 header.add_filter(raw_field);
-                parsed_field.push_back(static_cast<parsed_field_t>(header.parsed_header().filters.size()));
+                parsed_field.push_back(static_cast<elem_t>(header.parsed_header().filters.size()));
 
                 if (warn_on_missing_header_entries)
                 {
@@ -234,12 +228,16 @@ private:
     }
 
     //!\brief Overload for parsing INFO.
+    //TODO make this back_insertable
     template <typename key_t, typename value_t>
     void parse_field(tag_t<field::info> const & /**/, std::vector<std::pair<key_t, value_t>> & parsed_field)
     {
-        static_assert((std::same_as<key_t, int32_t>     && std::same_as<value_t, io_type_variant>) ||
-                      (std::same_as<key_t, std::string> && std::same_as<value_t, std::string>),
-                      "Unsupported key/value types for reading INFO field. See documentation of var_io::reader.");
+        static_assert(is_one_of<key_t, int32_t, std::string, std::string_view>,
+                      "The key type for reading INFO fields must be int32_t, std::string or std::string_view.");
+        static_assert(is_one_of<value_t, io_type_variant<true>, io_type_variant<false>, std::string, std::string_view>,
+                      "The value type for reading INFO fields must be int32_t, std::string or std::string_view.");
+        static_assert(!is_one_of<value_t, io_type_variant<true>, io_type_variant<false>> || std::same_as<key_t, int32_t>,
+                      "The key type for reading INFO fields may only be io_type_variant if the key type is int32_t.");
 
         std::string_view raw_field = get<field::info>(raw_record);
 
@@ -258,6 +256,7 @@ private:
             if (key_it == key_value_view.end() || (val_it != key_value_view.end() && post_it != key_value_view.end()))
                 error("Could not read INFO fields from the following string: ", subfield);
 
+            /* PARSE KEY */
             std::string_view key = *key_it;
             if constexpr (std::same_as<key_t, int32_t>)
             {
@@ -297,14 +296,15 @@ private:
                     ret.first = static_cast<key_t>(it->second);
                 }
             }
-            else // std::string
+            else // key_t is std::string or std::string_view
             {
-                ret.first = std::string{key};
+                ret.first = key_t{key};
             }
 
+            /* PARSE VALUE */
             if (val_it == key_value_view.end()) // no "=" → flag
             {
-                if constexpr (std::same_as<value_t, io_type_variant>)
+                if constexpr (is_one_of<value_t, io_type_variant<true>, io_type_variant<false>>)
                 {
                     if (header.parsed_header().infos.back().type != io_type_id::flag ||
                         header.parsed_header().infos.back().number != 0)
@@ -316,9 +316,9 @@ private:
                 }
                 // no-op for std::string
             }
-            else
+            else // any other type than flag
             {
-                if constexpr (std::same_as<value_t, io_type_variant>)
+                if constexpr (is_one_of<value_t, io_type_variant<true>, io_type_variant<false>>)
                 {
                     size_t num_val = detail::parse_io_type_variant(header.parsed_header().infos[ret.first].type,
                                                                    *val_it,
@@ -335,9 +335,9 @@ private:
                                      << "\n";
                     }
                 }
-                else // val_t == std::string
+                else // val_t == std::string or std::string_view
                 {
-                    ret.second = std::string{*val_it};
+                    ret.second = value_t{*val_it};
                 }
             }
 
@@ -345,10 +345,99 @@ private:
         }
     }
 
-    void parse_field(tag_t<field::genotypes> const & /**/, std::vector<genotype_element> & parsed_field)
+//     template <typename key_t, typename value_t>
+//     void parse_field(tag_t<field::genotypes> const & /**/, std::vector<std::pair<key_t, value_t>> & parsed_field)
+//     {
+//         static_assert(is_one_of<key_t, int32_t, std::string, std::string_view>,
+//                       "The key type for reading INFO fields must be int32_t, std::string or std::string_view.");
+//         static_assert(detail::is_io_type_vector_variant<value_t> ||
+//                       is_one_of<value_t, std::vector<std::string>, std::vector<std::string_view>>,
+//                       "The value type for reading INFO fields must be io_type_vector or a vector of std::string or "
+//                       "vector of std::string_view.");
+//         static_assert(!detail::is_io_type_vector_variant<key_t> || std::same_as<key_t, int32_t>,
+//                       "The key type for reading INFO fields may only be io_type_variant if the key type is int32_t.");
+//
+//         size_t column_number          = file_it->fields.size();
+//         size_t expected_column_number = header.parsed_header().samples.size() + 8;
+//
+//         if (column_number > 8) // there are genotypes
+//         {
+//             if (column_number != expected_column_number)
+//                 error("Expected ", expected_column_number, " columns in line but found", column_number, ".");
+//
+//             std::string_view format_names = file_it->fields[8];
+//
+//             /* parse keys */
+//             for (std::string_view format_name : format_names | views::eager_split(':'))
+//             {
+//                 if constexpr (std::same_as<key_t, int32_t>)
+//                 {
+//                     int32_t format_index = -1;
+//                     if (auto it = header.parsed_header().format_id_to_index.find(format_name);
+//                         it == header.parsed_header().format_id_to_index.end()) // format name was not in header, insert!
+//                     {
+//                         //TODO
+//                     }
+//                     else
+//                     {
+//                         format_index = it->second;
+//                     }
+//
+//                     parsed_field.push_back({format_index});
+//
+//                     header::format_t format const & header.parsed_header().formats[format_index];
+//
+//                     if constexpr (detail::is_io_type_vector_variant<value_t>)
+//                     {
+//                         detail::init_io_type_variant(format.type, parsed_field.back().second);
+//                         auto reserve = [s = column_number - 8] (auto & vec) { vec.reserve(s); };
+//                         std::visit(reserve, parsed_field.back().second);
+//                     }
+//                     else
+//                     {
+//                         parsed_field.back().second.reserve(column_number - 8);
+//                     }
+//
+//                 }
+//                 else
+//                 {
+//                     parsed_field.push_back(key_t{format_name});
+//                 }
+//             }
+//
+//             /* parse values/samples */
+//             for (size_t i = 9; i < column_number; ++i)
+//             {
+//                 std::string_view sample = file_it->fields[i];
+//
+//                 if constexpr (std::same_as<key_t, int32_t>)
+//                 {
+//
+//                 }
+//
+//                 size_t field_no = 0;
+//                 for (std::string_view field : sample | views::eager_split(':'))
+//                 {
+//
+//             }
+//
+//                 header::format_t format const & header.parsed_header().formats[format_index];
+//
+//
+//                 auto resize = [s = header.parsed_header().samples.count()] (auto & vec) { vec.resize(s); };
+//
+//
+//         }
+//
+//     }
+
+    template <typename value_t>
+        requires detail::is_io_type_vector_variant<value_t>
+    void parse_field(tag_t<field::genotypes> const & /**/, std::vector<std::pair<int32_t, value_t>> & parsed_field)
     {
         size_t column_number          = file_it->fields.size();
-        size_t expected_column_number = header.parsed_header().samples.count() + 8;
+        size_t expected_column_number = header.parsed_header().samples.size() ?
+                                        header.parsed_header().samples.size() + 9 : 8;
 
         if (column_number > 8) // there are genotypes
         {
@@ -357,9 +446,10 @@ private:
 
             std::string_view format_names = file_it->fields[8];
 
+            /* parse keys */
             for (std::string_view format_name : format_names | views::eager_split(':'))
             {
-                size_t format_index = -1;
+                int32_t format_index = -1;
                 if (auto it = header.parsed_header().format_id_to_index.find(format_name);
                     it == header.parsed_header().format_id_to_index.end()) // format name was not in header, insert!
                 {
@@ -370,34 +460,48 @@ private:
                     format_index = it->second;
                 }
 
-                header::format_t format const & header.parsed_header().formats[format_index];
+                parsed_field.push_back({format_index, {}});
 
-                auto resize = [s = header.parsed_header().samples.count()] (auto & vec) { vec.resize(s); };
+                var_io::header::format_t const & format = header.parsed_header().formats[format_index];
 
+                detail::init_io_type_variant(format.type, parsed_field.back().second);
+                auto reserve = [s = column_number - 8] (auto & vec) { vec.reserve(s); };
+                std::visit(reserve, parsed_field.back().second);
 
+            }
+
+            /* parse values/samples */
+            for (size_t i = 9; i < column_number; ++i)
+            {
+                std::string_view sample = file_it->fields[i];
+
+                size_t field_no = 0;
+                for (std::string_view field : sample | views::eager_split(':'))
+                {
+                    int32_t format_index = parsed_field[field_no].first;
+
+                    var_io::header::format_t const & format = header.parsed_header().formats[format_index];
+
+                    auto parse_and_append = [field, field_no] (auto & variant)
+                    {
+                        if constexpr (std::same_as<std::ranges::range_value_t<decltype(variant)>, bool>)
+                            variant.push_back(true);
+                        else
+                            variant.emplace_back();
+                        detail::parse_io_type_data_t{field}(variant.back());
+                    };
+                    std::visit(parse_and_append, parsed_field[field_no].second);
+
+                    ++field_no;
+                }
+            }
         }
     }
+
 
     void parse_field(tag_t<field::header> const & /**/, var_io::header const * & parsed_field)
     {
         parsed_field = &header;
-    }
-
-
-    /* TODO move to mixin: */
-
-    static var_io::allele parse_allele_impl(std::string_view in)
-    {
-        std::regex is_seq{"^[ACGTNacgtn]+$"};
-
-        if (in == "*")
-            return var_io::special_value::unknown;
-        else if (in == ".")
-            return var_io::special_value::missing;
-        else if (std::regex_match(in.begin(), in.end(), is_seq))
-            return in | views::char_to<dna5> | views::to<std::vector<dna5>>;
-        else
-            return std::string{in};
     }
 
 public:

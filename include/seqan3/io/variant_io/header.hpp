@@ -361,6 +361,10 @@ private:
         {
             parse_contig_line(strip_angular_brackets(l.substr(9)));
         }
+        else if (l.starts_with("#CHROM"))
+        {
+            parse_samples_line(l);
+        }
         else
         {
             parsed_data.other_lines.push_back(l);
@@ -484,6 +488,16 @@ private:
 
         parsed_data.contig_id_to_index[new_contig.id] = parsed_data.contigs.size();
         parsed_data.contigs.push_back(std::move(new_contig));
+    }
+
+    void parse_samples_line(std::string_view const l)
+    {
+        size_t i = 0;
+        for (std::string_view field : l | views::eager_split('\t'))
+        {
+            if (i++ > 9)
+                parsed_data.samples.push_back(field);
+        }
     }
 
     static inline std::string_view strip_angular_brackets(std::string_view const in)
