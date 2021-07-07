@@ -74,7 +74,7 @@ public:
     {
         std::string_view                             id;                //!< The ID.
         int64_t                                      length = -1;       //!< Length of the contig (-1 if absent).
-        std::map<std::string_view, std::string_view> other_fields;      //!< Other entries.
+        std::map<std::string_view, std::string_view> other_fields{};    //!< Other entries.
     };
 
     //!\brief Type of a INFO field header line.
@@ -82,18 +82,18 @@ public:
     {
         std::string_view                             id;                //!< The ID.
         //!\brief Number of values, see also seqan3::var_io::header_number.
-        int32_t                                      number;
-        io_type_id                                   type;              //!< Type of the field.
-        std::string_view                             description;       //!< Description.
-        std::map<std::string_view, std::string_view> other_fields;      //!< Other entries.
+        int32_t                                      number{};
+        io_type_id                                   type{};            //!< Type of the field.
+        std::string_view                             description{};     //!< Description.
+        std::map<std::string_view, std::string_view> other_fields{};    //!< Other entries.
     };
 
     //!\brief Type of a FILTER field header line.
     struct filter_t
     {
         std::string_view                             id;                //!< The ID.
-        std::string_view                             description;       //!< Description.
-        std::map<std::string_view, std::string_view> other_fields;      //!< Other entries.
+        std::string_view                             description{};     //!< Description.
+        std::map<std::string_view, std::string_view> other_fields{};    //!< Other entries.
     };
 
     using format_t = info_t;                                            //!< Type of a FORMAT field header line.
@@ -495,7 +495,7 @@ private:
         size_t i = 0;
         for (std::string_view field : l | views::eager_split('\t'))
         {
-            if (i++ > 9)
+            if (i++ > 8)
                 parsed_data.samples.push_back(field);
         }
     }

@@ -17,6 +17,7 @@
 
 #include <seqan3/utility/type_list/type_list.hpp>
 #include <seqan3/utility/views/eager_split.hpp>
+#include <seqan3/std/charconv>
 
 namespace seqan3
 {
@@ -109,7 +110,7 @@ enum class io_type_id
 
 //!\brief Variant to handle "dynamic typing" in alignment map IO and variant IO.
 template <bool shallow = true>
-using io_type_variant = std::variant<int8_t,                    // var_io only
+using io_type_variant = std::variant<bool,                    // var_io only
                                      char,                      // am_io only
                                      int32_t,
                                      float,
@@ -125,7 +126,7 @@ using io_type_variant = std::variant<int8_t,                    // var_io only
                                      std::vector<std::conditional_t<shallow, std::string_view, std::string>>>; // var_io only
 
 template <bool shallow = true>
-using io_type_vector_variant = std::variant<std::vector<int8_t>,                    // var_io only
+using io_type_vector_variant = std::variant<std::vector<bool>,                    // var_io only
                                             std::vector<char>,                      // am_io only
                                             std::vector<int32_t>,
                                             std::vector<float>,

@@ -23,12 +23,14 @@
 #include <seqan3/alphabet/views/char_to.hpp>
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/core/debug_stream/detail/to_string.hpp>
+#include <seqan3/core/debug_stream.hpp>                 //TODO evaluate if there is a besser solution
 #include <seqan3/io/detail/ignore_output_iterator.hpp>
 #include <seqan3/io/detail/misc.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
 #include <seqan3/io/format/format_vcf.hpp>
 #include <seqan3/io/plaintext_io/reader.hpp>
 #include <seqan3/io/stream/iterator.hpp>
+#include <seqan3/io/variant_io/header.hpp>
 #include <seqan3/io/variant_io/misc.hpp>
 #include <seqan3/range/detail/misc.hpp>
 #include <seqan3/std/algorithm>
@@ -152,11 +154,14 @@ private:
     {
         std::string_view raw_field = get<field::alt>(raw_record);
 
-        for (std::string_view subfield : raw_field | views::eager_split(','))
+        if (raw_field != ".")
         {
-            parsed_field.emplace_back();
-            // delegate parsing of element to base
-            parse_field_impl(subfield, parsed_field.back());
+            for (std::string_view subfield : raw_field | views::eager_split(','))
+            {
+                parsed_field.emplace_back();
+                // delegate parsing of element to base
+                parse_field_impl(subfield, parsed_field.back());
+            }
         }
     }
 
@@ -180,10 +185,10 @@ private:
     //!\brief Overload for parsing FILTER as strings.
     template <typename parsed_field_t>
         requires (detail::back_insertable<parsed_field_t> &&
-                  is_one_of<std::ranges::range_reference_t<parsed_field_t>, std::string, std::string_view>)
+                  is_one_of<std::ranges::range_value_t<parsed_field_t>, std::string, std::string_view>)
     void parse_field(tag_t<field::filter> const & /**/, parsed_field_t & parsed_field)
     {
-        using elem_t = std::ranges::range_reference_t<parsed_field_t>;
+        using elem_t = std::ranges::range_value_t<parsed_field_t>;
         std::string_view raw_field = get<field::filter>(raw_record);
 
         if (raw_field == ".")
@@ -196,10 +201,10 @@ private:
     //!\brief Overload for parsing FILTER as indexes.
     template <typename parsed_field_t>
     requires (detail::back_insertable<parsed_field_t> &&
-              std::integral<std::ranges::range_reference_t<parsed_field_t>>)
+              std::integral<std::ranges::range_value_t<parsed_field_t>>)
     void parse_field(tag_t<field::filter> const & /**/, parsed_field_t & parsed_field)
     {
-        using elem_t = std::ranges::range_reference_t<parsed_field_t>;
+        using elem_t = std::ranges::range_value_t<parsed_field_t>;
         std::string_view raw_field = get<field::filter>(raw_record);
 
         if (raw_field == ".")
@@ -210,19 +215,19 @@ private:
             if (auto it = header.parsed_header().filter_id_to_index.find(raw_field);
                      it == header.parsed_header().filter_id_to_index.end()) // filter name was not in header, insert!
             {
-                header.add_filter(raw_field);
+                header.add_filter(subfield);
                 parsed_field.push_back(static_cast<elem_t>(header.parsed_header().filters.size()));
 
                 if (warn_on_missing_header_entries)
                 {
-                    debug_stream << "[seqan3::var_io::warning] The filter name \"" << raw_field << "\" found on line "
+                    debug_stream << "[seqan3::var_io::warning] The filter name \"" << subfield << "\" found on line "
                                  << line << "was not present in the header.\n";
                 }
 
             }
             else
             {
-                parsed_field.push_back(static_cast<parsed_field_t>(it->second));
+                parsed_field.push_back(static_cast<elem_t>(it->second));
             }
         }
     }
@@ -447,6 +452,7 @@ private:
             std::string_view format_names = file_it->fields[8];
 
             /* parse keys */
+            size_t formats = 0;
             for (std::string_view format_name : format_names | views::eager_split(':'))
             {
                 int32_t format_index = -1;
@@ -468,6 +474,7 @@ private:
                 auto reserve = [s = column_number - 8] (auto & vec) { vec.reserve(s); };
                 std::visit(reserve, parsed_field.back().second);
 
+                ++formats;
             }
 
             /* parse values/samples */
@@ -475,24 +482,33 @@ private:
             {
                 std::string_view sample = file_it->fields[i];
 
-                size_t field_no = 0;
-                for (std::string_view field : sample | views::eager_split(':'))
+                auto fields_view = sample | views::eager_split(':');
+                auto fields_it = std::ranges::begin(fields_view);
+
+                for (size_t i = 0; i < formats; ++i)
                 {
-                    int32_t format_index = parsed_field[field_no].first;
+                    std::string_view field{};
 
-                    var_io::header::format_t const & format = header.parsed_header().formats[format_index];
+                    if (fields_it != std::default_sentinel)
+                    {
+                        field = *fields_it;
+                        ++fields_it;
+                    }
+                    else // this handles trailing dropped fields
+                    {
+                        field = ".";
+                    }
 
-                    auto parse_and_append = [field, field_no] (auto & variant)
+                    auto parse_and_append = [field, i] (auto & variant)
                     {
                         if constexpr (std::same_as<std::ranges::range_value_t<decltype(variant)>, bool>)
                             variant.push_back(true);
                         else
                             variant.emplace_back();
+
                         detail::parse_io_type_data_t{field}(variant.back());
                     };
-                    std::visit(parse_and_append, parsed_field[field_no].second);
-
-                    ++field_no;
+                    std::visit(parse_and_append, parsed_field[i].second);
                 }
             }
         }
@@ -519,7 +535,6 @@ public:
     {
         /* potentially extract useful runtime options from config and store as members */
 
-        bool file_format_read = false;
         while (file_it != std::default_sentinel && file_it.peak() == '#')
         {
             ++file_it;

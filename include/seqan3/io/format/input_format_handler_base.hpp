@@ -195,7 +195,7 @@ public:
     void parse_next_record_into(parsed_record_t & parsed_record)
     {
         if (std::istreambuf_iterator<char>{*stream} == std::istreambuf_iterator<char>{})
-            throw 42;
+            throw std::runtime_error{"Cannot read record, end of file reached."};
 
         // create new raw record
         to_derived()->read_raw_record();

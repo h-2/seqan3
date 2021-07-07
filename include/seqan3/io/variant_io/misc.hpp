@@ -109,6 +109,12 @@ struct parse_io_type_data_t
         return 0;
     }
 
+    inline size_t operator()(std::vector<bool>::reference output) const
+    {
+        output = true;
+        return 0;
+    }
+
     constexpr size_t operator()(char & output) const
     {
         assert(input.size() == 1);
@@ -143,10 +149,13 @@ struct parse_io_type_data_t
     //TODO back_insertable
     inline size_t operator()(std::vector<elem_t> & vec) const
     {
-        for (std::string_view s : input | views::eager_split(','))
+        if (input != missing)
         {
-            vec.emplace_back();
-            parse_io_type_data_t{s}(vec.back());
+            for (std::string_view s : input | views::eager_split(','))
+            {
+                vec.emplace_back();
+                parse_io_type_data_t{s}(vec.back());
+            }
         }
 
         return vec.size();

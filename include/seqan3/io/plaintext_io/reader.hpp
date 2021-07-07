@@ -144,7 +144,7 @@ public:
         //TODO: does this handle premature EOF?
         while (!rec_end_found)
         {
-            for (count = 0; count < (stream_buf->egptr() - stream_buf->gptr()); ++count)
+            for (count = 0; count < static_cast<size_t>(stream_buf->egptr() - stream_buf->gptr()); ++count)
             {
                 if (stream_buf->gptr()[count] == rec_sep)
                 {
