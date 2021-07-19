@@ -171,6 +171,9 @@ public:
      * \returns An iterator pointing to the current position in the file.
      * \throws seqan3::format_error
      *
+     * It is safe to call this function repeatedly, but it will always return an iterator pointing to the current
+     * record in the file (and not seek back to the beginning).
+     *
      * Equals end() if the file is at end.
      *
      * ### Complexity

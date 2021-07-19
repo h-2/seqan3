@@ -23,7 +23,7 @@
 #include <seqan3/alphabet/views/char_to.hpp>
 #include <seqan3/core/range/type_traits.hpp>
 #include <seqan3/core/debug_stream/detail/to_string.hpp>
-#include <seqan3/core/debug_stream.hpp>                 //TODO evaluate if there is a besser solution
+#include <seqan3/core/debug_stream.hpp>                 //TODO evaluate if there is a better solution
 #include <seqan3/io/detail/ignore_output_iterator.hpp>
 #include <seqan3/io/detail/misc.hpp>
 #include <seqan3/io/format/input_format_handler_base.hpp>
@@ -53,16 +53,37 @@ private:
 
     /* RAW RECORD HANDLING*/
     using format_fields     = decltype(var_io::default_field_ids);
-    using raw_record_type   = seqan3::record<list_traits::repeat<format_fields::size, std::string_view>,
-                                             format_fields>;
+    using raw_format_fields = tag_t<field::chrom,
+                                    field::pos,
+                                    field::id,
+                                    field::ref,
+                                    field::alt,
+                                    field::qual,
+                                    field::filter,
+                                    field::info,
+                                    field::genotypes>; // without _private field; no meta to drop last :(
+    //!\brief The raw record. The _private field is omitted here.
+    using raw_record_type   = seqan3::record<list_traits::repeat<raw_format_fields::size, std::string_view>,
+                                             raw_format_fields>;
 
-    raw_record_type raw_record;
-    plain_io::detail::plaintext_input_iterator<char, std::char_traits<char>, plain_io::record_kind::line_and_fields> file_it;
-    std::string_view last_chrom;
-    size_t           last_chrom_index = -1;
-    size_t           line = 0;
+    //!\brief Type of the low-level iterator.
+    using lowlevel_iterator =
+      plain_io::detail::plaintext_input_iterator<char, std::char_traits<char>, plain_io::record_kind::line_and_fields>;
 
-
+    //!\brief The raw record.
+    raw_record_type     raw_record;
+    //!\brief The header.
+    var_io::header      header;
+    //!\brief Lowlevel stream iterator.
+    lowlevel_iterator   file_it;
+    //!\brief Cache of the chromosome string.
+    std::string_view    last_chrom;
+    //!\brief Cache of the chromosome index.
+    size_t              last_chrom_index = -1;
+    //!\brief Current line number in file.
+    size_t              line = 0;
+    //!\brief Whether to print print_warnings or not.
+    bool                print_warnings = true;
 
     [[noreturn]] void error(auto const & ... messages)
     {
@@ -76,6 +97,8 @@ private:
     {
         ++line;
         ++file_it;
+
+        //TODO assert number of fields
 
         get<field::chrom> (raw_record) = (*file_it).fields[0];
         get<field::pos>   (raw_record) = (*file_it).fields[1];
@@ -92,22 +115,14 @@ private:
         char const * end_line   = (*file_it).line.data()      + (*file_it).line.size();
         // genotypes fo from end of qual til end of line (possibly empty)
         get<field::genotypes>  (raw_record) = std::string_view{end_qual, static_cast<size_t>(end_line - end_qual)};
-
-        // header does not need to be reset
     }
 
 
-
-    /* OPTIONS */
-
-    bool warn_on_missing_header_entries = false;
-
     /* PARSED RECORD HANDLING */
-    var_io::header header;
 
     //!\brief Default field handlers.
     using base_t::parse_field;
-    using base_t::parse_field_impl;
+    using base_t::parse_field_aux;
 
     //!\brief Parse the CHROM field. Reading chrom as number means getting the index (not converting string to number).
     template <std::integral parsed_field_t>
@@ -128,10 +143,10 @@ private:
                 last_chrom_index = header.parsed_header().contigs.size() - 1;
                 parsed_field = static_cast<parsed_field_t>(last_chrom_index);
 
-                if (warn_on_missing_header_entries)
+                if (print_warnings)
                 {
                     debug_stream << "[seqan3::var_io::warning] The contig name \"" << raw_field << "\" found on line "
-                                 << line << "was not present in the header.\n";
+                                 << line << " is not present in the header.\n";
                 }
             }
             else
@@ -160,7 +175,7 @@ private:
             {
                 parsed_field.emplace_back();
                 // delegate parsing of element to base
-                parse_field_impl(subfield, parsed_field.back());
+                parse_field_aux(subfield, parsed_field.back());
             }
         }
     }
@@ -178,7 +193,7 @@ private:
         else
         {
             parsed_field = parsed_field_t{};
-            parse_field_impl(raw_field, parsed_field); // arithmetic parsing
+            parse_field_aux(raw_field, parsed_field); // arithmetic parsing
         }
     }
 
@@ -218,7 +233,7 @@ private:
                 header.add_filter(subfield);
                 parsed_field.push_back(static_cast<elem_t>(header.parsed_header().filters.size()));
 
-                if (warn_on_missing_header_entries)
+                if (print_warnings)
                 {
                     debug_stream << "[seqan3::var_io::warning] The filter name \"" << subfield << "\" found on line "
                                  << line << "was not present in the header.\n";
@@ -290,7 +305,7 @@ private:
 
                     ret.first = static_cast<key_t>(header.parsed_header().infos.size());
 
-                    if (warn_on_missing_header_entries)
+                    if (print_warnings)
                     {
                         debug_stream << "[seqan3::var_io::warning] The INFO name \"" << raw_field << "\" found on line "
                                      << line << "was not present in the header.\n";
@@ -325,17 +340,17 @@ private:
             {
                 if constexpr (is_one_of<value_t, io_type_variant<true>, io_type_variant<false>>)
                 {
-                    size_t num_val = detail::parse_io_type_variant(header.parsed_header().infos[ret.first].type,
+                    int32_t num_val = detail::parse_io_type_variant(header.parsed_header().infos[ret.first].type,
                                                                    *val_it,
                                                                    ret.second);
-                    if (size_t exp_val = header.parsed_header().infos[ret.first].number;
-                        warn_on_missing_header_entries && num_val != exp_val)
+                    if (int32_t exp_val = header.parsed_header().infos[ret.first].number;
+                        print_warnings && num_val != exp_val && exp_val >= 0)
                     {
                         debug_stream << "[seqan3::var_io::warning] Expected to find "
                                      << exp_val
-                                     << "values for the INFO field "
-                                     << raw_field
-                                     << "but found: "
+                                     << " values for the INFO field "
+                                     << subfield
+                                     << " but found: "
                                      << num_val
                                      << "\n";
                     }
@@ -515,9 +530,9 @@ private:
     }
 
 
-    void parse_field(tag_t<field::header> const & /**/, var_io::header const * & parsed_field)
+    void parse_field(tag_t<field::_private> const & /**/, var_io::record_private_data & parsed_field)
     {
-        parsed_field = &header;
+        parsed_field = var_io::record_private_data{.header_ptr = &header};
     }
 
 public:
@@ -528,12 +543,13 @@ public:
     input_format_handler & operator=(input_format_handler const &)      = delete;
     input_format_handler & operator=(input_format_handler &&)           = default;
 
-    template <typename config_t>
-    input_format_handler(std::istream & str, config_t const & /*cfg*/) :
+    template <typename options_t>
+    input_format_handler(std::istream & str, options_t const & options) :
         base_t{str}, file_it{str, false /*no_init!*/}
 
     {
-        /* potentially extract useful runtime options from config and store as members */
+        // extract options
+        print_warnings = options.print_warnings;
 
         while (file_it != std::default_sentinel && file_it.peak() == '#')
         {
@@ -542,9 +558,13 @@ public:
             header.add_raw_line(l);
             ++line;
         }
-
-        get<field::header>(raw_record)  = header.raw_header();
     }
+
+    var_io::header const * get_header() const
+    {
+        return &header;
+    }
+
 };
 
 } // namespace seqan

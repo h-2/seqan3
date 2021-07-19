@@ -15,6 +15,8 @@
 
 #include <tuple>
 
+#include <seqan3/core/concept/core_language.hpp>
+#include <seqan3/core/detail/debug_stream_type.hpp>
 #include <seqan3/utility/type_list/type_list.hpp>
 #include <seqan3/utility/views/eager_split.hpp>
 #include <seqan3/std/charconv>
@@ -107,6 +109,14 @@ enum class io_type_id
     vector_of_float32,
     vector_of_string
 };
+
+template <typename char_t>
+inline debug_stream_type<char_t> & operator<<(debug_stream_type<char_t> & s, io_type_id const & id)
+{
+    //TODO print nice string
+    s << (size_t)id;
+    return s;
+}
 
 //!\brief Variant to handle "dynamic typing" in alignment map IO and variant IO.
 template <bool shallow = true>

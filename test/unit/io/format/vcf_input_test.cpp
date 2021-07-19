@@ -12,57 +12,9 @@
 #include <seqan3/io/format/format_vcf_input_handler.hpp>
 #include <seqan3/io/variant_io/reader.hpp>
 
+#include "vcf_input_data.hpp"
+
 using namespace seqan3::literals;
-
-// https://samtools.github.io/hts-specs/VCFv4.3.pdf
-inline constexpr std::string_view example_from_spec =
-R"(##fileformat=VCFv4.3
-##fileDate=20090805
-##source=myImputationProgramV3.1
-##reference=file:///seq/references/1000GenomesPilot-NCBI36.fasta
-##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species="Homo sapiens",taxonomy=x>
-##phasing=partial
-##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">
-##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
-##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-##INFO=<ID=AA,Number=1,Type=String,Description="Ancestral Allele">
-##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP membership, build 129">
-##INFO=<ID=H2,Number=0,Type=Flag,Description="HapMap2 membership">
-##FILTER=<ID=q10,Description="Quality below 10">
-##FILTER=<ID=s50,Description="Less than 50% of samples have data">
-##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
-##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
-##FORMAT=<ID=HQ,Number=2,Type=Integer,Description="Haplotype Quality">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NA00001	NA00002	NA00003
-20	14370	rs6054257	G	A	29	PASS	NS=3;DP=14;AF=0.5;DB;H2	GT:GQ:DP:HQ	0|0:48:1:51,51	1|0:48:8:51,51	1/1:43:5:.,.
-20	17330	.	T	A	3	q10	NS=3;DP=11;AF=0.017	GT:GQ:DP:HQ	0|0:49:3:58,50	0|1:3:5:65,3	0/0:41:3
-20	1110696	rs6040355	A	G,T	67	PASS	NS=2;DP=10;AF=0.333,0.667;AA=T;DB	GT:GQ:DP:HQ	1|2:21:6:23,27	2|1:2:0:18,2	2/2:35:4
-20	1230237	.	T	.	47	PASS	NS=3;DP=13;AA=T	GT:GQ:DP:HQ	0|0:54:7:56,60	0|0:48:4:51,51	0/0:61:2
-20	1234567	microsat1	GTC	G,GTCT	50	PASS	NS=3;DP=9;AA=G	GT:GQ:DP	0/1:35:4	0/2:17:2	1/1:40:3
-)";
-
-inline constexpr std::string_view example_from_spec_header =
-R"(##fileformat=VCFv4.3
-##fileDate=20090805
-##source=myImputationProgramV3.1
-##reference=file:///seq/references/1000GenomesPilot-NCBI36.fasta
-##contig=<ID=20,length=62435964,assembly=B36,md5=f126cdf8a6e0c7f379d618ff66beb2da,species="Homo sapiens",taxonomy=x>
-##phasing=partial
-##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">
-##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
-##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">
-##INFO=<ID=AA,Number=1,Type=String,Description="Ancestral Allele">
-##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP membership, build 129">
-##INFO=<ID=H2,Number=0,Type=Flag,Description="HapMap2 membership">
-##FILTER=<ID=q10,Description="Quality below 10">
-##FILTER=<ID=s50,Description="Less than 50% of samples have data">
-##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
-##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">
-##FORMAT=<ID=HQ,Number=2,Type=Integer,Description="Haplotype Quality">
-#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NA00001	NA00002	NA00003
-)";
 
 template <bool shallow>
 void main_test()
@@ -70,13 +22,13 @@ void main_test()
     std::istringstream istr{std::string{example_from_spec}};
 
     using record_t = std::conditional_t<shallow,
-                                        seqan3::record<std::remove_cvref_t<decltype(seqan3::var_io::shallow_field_types)>,
+                                        seqan3::record<std::remove_cvref_t<decltype(seqan3::var_io::field_types_shallow)>,
                                                        std::remove_cvref_t<decltype(seqan3::var_io::default_field_ids)>>,
-                                        seqan3::record<std::remove_cvref_t<decltype(seqan3::var_io::deep_field_types)>,
+                                        seqan3::record<std::remove_cvref_t<decltype(seqan3::var_io::field_types_deep)>,
                                                        std::remove_cvref_t<decltype(seqan3::var_io::default_field_ids)>>>;
     using string_t = std::conditional_t<shallow, std::string_view, std::string>;
 
-    seqan3::input_format_handler<seqan3::format_vcf> handler{istr, int{} /*unused*/};
+    seqan3::input_format_handler<seqan3::format_vcf> handler{istr, seqan3::var_io::reader_options{}};
 
     record_t rec;
 
@@ -155,7 +107,7 @@ void main_test()
     EXPECT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[2][1],
               seqan3::var_io::missing_value<int32_t>);
 
-    EXPECT_EQ(get<seqan3::field::header>(rec)->raw_header(), example_from_spec_header);
+    EXPECT_EQ(get<seqan3::field::_private>(rec).header_ptr->raw_header(), example_from_spec_header);
 
     /* SECOND RECORD */
     handler.parse_next_record_into(rec);
@@ -219,7 +171,7 @@ void main_test()
     EXPECT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[1][1], 3);
     ASSERT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[2].size(), 0);
 
-    EXPECT_EQ(get<seqan3::field::header>(rec)->raw_header(), example_from_spec_header);
+    EXPECT_EQ(get<seqan3::field::_private>(rec).header_ptr->raw_header(), example_from_spec_header);
 
     /* THIRD RECORD */
     handler.parse_next_record_into(rec);
@@ -295,7 +247,7 @@ void main_test()
     EXPECT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[1][1], 2);
     ASSERT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[2].size(), 0);
 
-    EXPECT_EQ(get<seqan3::field::header>(rec)->raw_header(), example_from_spec_header);
+    EXPECT_EQ(get<seqan3::field::_private>(rec).header_ptr->raw_header(), example_from_spec_header);
 
     /* FOURTH RECORD */
     handler.parse_next_record_into(rec);
@@ -358,7 +310,7 @@ void main_test()
     EXPECT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[1][1], 51);
     ASSERT_EQ(get<std::vector<std::vector<int32_t>>>(get<seqan3::field::genotypes>(rec)[3].second)[2].size(), 0);
 
-    EXPECT_EQ(get<seqan3::field::header>(rec)->raw_header(), example_from_spec_header);
+    EXPECT_EQ(get<seqan3::field::_private>(rec).header_ptr->raw_header(), example_from_spec_header);
 
     /* FIFTH RECORD */
     handler.parse_next_record_into(rec);
@@ -412,7 +364,7 @@ void main_test()
     EXPECT_EQ(get<std::vector<int32_t>>(get<seqan3::field::genotypes>(rec)[2].second)[1], 2);
     EXPECT_EQ(get<std::vector<int32_t>>(get<seqan3::field::genotypes>(rec)[2].second)[2], 3);
 
-    EXPECT_EQ(get<seqan3::field::header>(rec)->raw_header(), example_from_spec_header);
+    EXPECT_EQ(get<seqan3::field::_private>(rec).header_ptr->raw_header(), example_from_spec_header);
 
     /* END */
 

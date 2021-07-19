@@ -90,10 +90,8 @@ inline constexpr auto default_field_ids = tag<field::chrom,
                                               field::filter,
                                               field::info,
                                               field::genotypes,
-                                              field::header>;
-
+                                              field::_private>;
 } // namespace seqan3::var_io
-
 
 namespace seqan3::detail
 {

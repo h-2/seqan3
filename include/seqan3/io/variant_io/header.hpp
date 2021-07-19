@@ -18,6 +18,7 @@
 #include <map>
 #include <vector>
 
+#include <seqan3/io/exception.hpp>
 #include <seqan3/io/utility.hpp>
 #include <seqan3/utility/views/eager_split.hpp>
 
@@ -27,12 +28,12 @@ namespace seqan3::var_io
 //!\ingroup variant_io
 struct header_number
 {
-    enum
+    enum : int32_t
     {
         A   = -1,   //!< One value per alternate allele.
         R   = -2,   //!< One value for each possible allele (including ref) -> A + 1.
         G   = -3,   //!< One value per Genotype.
-        dot = -4    //!< Unknown, unspecified or unbounded.
+        dot = -4,   //!< Unknown, unspecified or unbounded.
     };
 };
 
@@ -56,7 +57,7 @@ public:
     header & operator=(header &&)         = default;
     ~header()                             = default;
 
-    header(std::string plaintext_header)
+    explicit header(std::string plaintext_header)
         : raw_data{std::move(plaintext_header)}
     {
         init();
@@ -600,6 +601,17 @@ private:
 
         return ret;
     }
+};
+
+//!\brief A datastructure that contains private data variant IO records.
+//!\ingroup variant_io
+struct record_private_data
+{
+    //!\privatesection
+    //!\brief Pointer to the header
+    header * header_ptr = nullptr;
+
+    // TODO pointer to bcf-record
 };
 
 } // namespace seqan3::var_io

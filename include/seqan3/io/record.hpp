@@ -62,7 +62,7 @@ namespace seqan3
  */
 enum class field : uint64_t
 {
-    // Fields used in multiple contexts ........................................
+    // Fields used in multiple contexts
     seq,            //!< The "sequence", usually a range of nucleotides or amino acids.
     id,             //!< The identifier, usually a string.
     qual,           //!< The qualities, usually in phred-score notation.
@@ -70,10 +70,10 @@ enum class field : uint64_t
     offset,         //!< Sequence (SEQ) relative start position (0-based), unsigned value.
     ref_id,
     ref_seq,        //!< The (reference) "sequence" information, usually a range of nucleotides or amino acids.
-    header,         //!< A reference to the header of a file.
     pos,            //!< Sequence (REF_SEQ) relative start position (0-based), unsigned value.
+    _private,       //!< Refers to arbitrary internal datastructures (**never modify this field**).
 
-    // Fields unique to structure io ...........................................
+    // Fields unique to structure io
     bpp,            //!< Base pair probability matrix of interactions, usually a matrix of float numbers.
     structure,      //!< Fixed interactions, usually a string of structure alphabet characters.
     structured_seq, //!< Sequence and fixed interactions combined in one range.
@@ -82,7 +82,7 @@ enum class field : uint64_t
     react_err,      //!< Reactivity error values given in a vector corresponding to REACT.
     comment,        //!< Comment field of arbitrary content, usually a string.
 
-    // Fields unique to alignment io ...........................................
+    // Fields unique to alignment io
     qname = id,
     flag = comment + 1,           //!< The alignment flag (bit information), `uint16_t` value.
     /*ref_id*/      //!< The identifier of the (reference) sequence that SEQ was aligned to.
@@ -95,11 +95,11 @@ enum class field : uint64_t
     /*seq*/
     /*qual*/
     optionals,      //!< The optional fields in the SAM format, stored in a dictionary.
-    /*header*/
+    /*_private*/
 
     alignment,      //!< The (pairwise) alignment stored in an seqan3::alignment object.
 
-    // Fields unique to variant io ...........................................
+    // Fields unique to variant io
     chrom = ref_id, //
     /*pos*/
     /*id*/
@@ -109,6 +109,7 @@ enum class field : uint64_t
     filter,
     info,
     genotypes,
+    /*_private*/
 
     // User defined field aliases .. ...........................................
     user_defined = uint64_t{1} << 32 , //!< Identifier for user defined file formats and specialisations.

@@ -30,43 +30,75 @@
 namespace seqan3::var_io
 {
 
+/*!\name Pre-defined field types
+ * \brief These can be used to configure the behaviour of the seqan3::var_io::reader va seqan3::var_io::reader_options.
+ * \{
+ */
+
 /*!\brief Shallow field types for variant io.
  *!\ingroup variant_io
  *
  * \details
  *
- * These traits define a record type with minimal memory allocations. It is the recommended record type when
- * streaming over the input file.
+ * These traits define a record type with minimal memory allocations for all input formats.
+ * It is the recommended record type when iterating ("streaming") over files that ca be any variant IO format.
  *
  * Where possible numeric IDs are used (BCF-style).
  *
  * \warning Shallow types
  *
- * These records are not self-contained, i.e. they depend on caches and will become invalid when the file
- * is moved to the next record.
- * Since some elements in the record are views, it may not be trivial to change all values.
+ * These records are not self-contained, i.e. they depend on caches and will become invalid when the reader moves to
+ * the next record.
+ * Since some elements in the record are views, it may not be possible and/or safe to change all values.
  */
-inline constexpr auto shallow_field_types = type_tag<int32_t,                             // field::chrom,
+inline constexpr auto field_types_shallow = type_tag<int32_t,                             // field::chrom,
                                                      int32_t,                             // field::pos,
                                                      std::string_view,                    // field::id,
-                                                     decltype(std::string_view{} | views::char_to<seqan3::dna5>),// field::ref,
+                                                     decltype(std::string_view{} | views::char_strictly_to<seqan3::dna5>),// field::ref,
                                                      std::vector<std::string_view>,       // field::alt,
                                                      float,                               // field::qual,
                                                      std::vector<int32_t>,                // field::filter,
                                                      std::vector<info_element<true>>,     // field::info,
                                                      std::vector<genotype_element<true>>, // field::genotypes,
-//                                                      std::string_view, // field::genotypes,
-                                                     header const *>;                     // field::header>;
+                                                     record_private_data>;                // field::_private>;
 
+/*!\brief Shallow field types for variant IO with text IDs.
+ *!\ingroup variant_io
+ *
+ * \details
+ *
+ * The same as seqan3::var_io::field_types_shallow except that VCF-style text IDs are used.
+ *
+ * \warning Shallow types
+ *
+ * These records are not self-contained, i.e. they depend on caches and will become invalid when the reader moves to
+ * the next record.
+ * Since some elements in the record are views, it may not be possible and/or safe to change all values.
+ */
+inline constexpr auto field_types_shallow_text = type_tag<std::string_view,               // field::chrom,
+                                                     int32_t,                             // field::pos,
+                                                     std::string_view,                    // field::id,
+                                                     decltype(std::string_view{} | views::char_strictly_to<seqan3::dna5>),// field::ref,
+                                                     std::vector<std::string_view>,       // field::alt,
+                                                     float,                               // field::qual,
+                                                     std::vector<std::string_view>,       // field::filter,
+                                                     std::vector<std::pair<std::string_view, io_type_variant<true>>>,     // field::info,
+                                                     std::vector<genotype_element<true>>, // field::genotypes,
+//                                                      std::vector<std::pair<std::string_view, io_type_vector_variant<shallow>>, //TODO
+                                                     record_private_data>;                // field::_private>;
 
 /*!\brief Deep field types for variant io.
  *!\ingroup variant_io
  *
  * \details
  *
- * TODO
+ * These field types result in a record that is self-contained, i.e. it does not depend on internal caches and the
+ * state of the reader.
+ *
+ * Use these field types, if you intend to store individual records or if you need to change fields in the record
+ * that are otherwise not modifiable (e.g. views). *
  */
-inline constexpr auto    deep_field_types = type_tag<int32_t,                             // field::chrom,
+inline constexpr auto field_types_deep =    type_tag<int32_t,                             // field::chrom,
                                                      int32_t,                             // field::pos,
                                                      std::string,                         // field::id,
                                                      std::vector<seqan3::dna5>,           // field::ref,
@@ -75,17 +107,14 @@ inline constexpr auto    deep_field_types = type_tag<int32_t,                   
                                                      std::vector<int32_t>,                // field::filter,
                                                      std::vector<info_element<false>>,    // field::info,
                                                      std::vector<genotype_element<false>>,// field::genotypes,
-                                                     header const *>;
+                                                     record_private_data>;                // field::_private
+
 
 //!\brief Every field is configured as a std::span of std::byte (this enables "raw" io).
 //!\ingroup variant_io
-inline constexpr auto raw_field_types = list_traits::repeat<default_field_ids.size, std::span<std::byte>>{};
+inline constexpr auto field_types_raw = list_traits::repeat<default_field_ids.size, std::span<std::byte>>{};
 
-//!\brief Every field is configured as a std::string.
-//!\ingroup variant_io
-inline constexpr auto string_field_types = list_traits::repeat<default_field_ids.size, std::string>{};
-
-
+//!\}
 
 /*!\brief Options that can be used to configure the behaviour of seqan3::var_io::reader.
  * \tparam field_ids_t   Type of the field_ids member (usually deduced).
@@ -98,7 +127,7 @@ inline constexpr auto string_field_types = list_traits::repeat<default_field_ids
  * TODO describe how to easily initialise this
  */
 template <typename field_ids_t = decltype(default_field_ids),
-          typename field_types_t = decltype(shallow_field_types),
+          typename field_types_t = decltype(field_types_shallow),
           typename formats_t = type_list<format_vcf>>
 struct reader_options
 {
@@ -121,18 +150,20 @@ struct reader_options
      */
     formats_t formats{};
 
+    //!\brief Whether to print non-critical file format warnings.
+    bool print_warnings = true;
+
     //!\brief Options that are passed on to the internal stream oject.
     transparent_istream_options stream_options{};
 
     //TODO static_assert
-
 };
 
 // ----------------------------------------------------------------------------
 // reader
 // ----------------------------------------------------------------------------
 
-/*!\brief A class for reading alignment map files, e.g. SAM, BAM, CRAM.
+/*!\brief A class for reading variant files, e.g. VCF, BCF, GVCF.
  * \tparam options_t A specialisation of seqan3::var_io::reader_options.
  * \ingroup variant_io
  *
@@ -143,8 +174,14 @@ struct reader_options
 template <typename options_t = reader_options<>>
 class reader : public reader_base<options_t>
 {
+private:
     using base_t = reader_base<options_t>;
     using typename base_t::format_type;
+
+    seqan3::var_io::header const * header_ptr = nullptr;
+
+    using base_t::format_handler;
+
 public:
 
     // need these for CTAD
@@ -163,6 +200,19 @@ public:
     reader(std::istream && stream, format_type const & fmt, options_t const & opt) :
         base_t{std::move(stream), fmt, opt}
     {}
+
+    seqan3::var_io::header const & header()
+    {
+        if (header_ptr == nullptr)
+        {
+            // ensure that the format_handler is created
+            this->begin();
+
+            header_ptr = std::visit([] (auto const & handler) { return handler.get_header(); }, format_handler);
+        }
+
+        return *header_ptr;
+    }
 };
 
-} // namespace seqan3
+} // namespace seqan3::var_io

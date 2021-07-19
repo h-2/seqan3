@@ -77,20 +77,20 @@ private:
      * \{
      */
     //!\brief Not parsing at all / *raw IO*.
-    static void parse_field_impl(std::string_view const in, std::span<std::byte> & parsed_field)
+    static void parse_field_aux(std::string_view const in, std::span<std::byte> & parsed_field)
     {
         parsed_field = std::span<std::byte>{reinterpret_cast<std::byte*>(in.data()), in.size()};
     }
 
     //!\brief Parsing into string views. NOTE: binary formats may want to = delete override this.
-    static void parse_field_impl(std::string_view const in, std::string_view & parsed_field)
+    static void parse_field_aux(std::string_view const in, std::string_view & parsed_field)
     {
         parsed_field = in;
     }
 
     //!\brief Parsing into transformed string views. NOTE: binary formats may want to = delete override this.
     template <typename fun_t>
-    static void parse_field_impl(std::string_view const in,
+    static void parse_field_aux(std::string_view const in,
                                  std::ranges::transform_view<std::string_view, fun_t> & parsed_field)
     {
         parsed_field = std::ranges::transform_view<std::string_view, fun_t>{in, fun_t{}};
@@ -100,7 +100,7 @@ private:
     template <typename parsed_field_t>
         requires std::ranges::range<parsed_field_t> &&
                  detail::back_insertable_with<parsed_field_t, char>
-    static void parse_field_impl(std::string_view const in, parsed_field_t & parsed_field)
+    static void parse_field_aux(std::string_view const in, parsed_field_t & parsed_field)
     {
 //         auto adaptor = detail::get_or_view_all<field_id>(to_derived());
 //         detail::sized_range_copy(raw_field | adaptor, parsed_field);
@@ -113,7 +113,7 @@ private:
                   !detail::back_insertable_with<parsed_field_t, char> &&
                   alphabet<std::ranges::range_reference_t<parsed_field_t>> &&
                   detail::back_insertable_with<parsed_field_t, std::ranges::range_reference_t<parsed_field_t>>)
-    static void parse_field_impl(std::string_view const in, parsed_field_t & parsed_field)
+    static void parse_field_aux(std::string_view const in, parsed_field_t & parsed_field)
     {
         using target_alph_type = std::ranges::range_value_t<parsed_field_t>;
         detail::sized_range_copy(in | views::char_strictly_to<target_alph_type>,
@@ -123,11 +123,10 @@ private:
 //                                  parsed_field);
     }
 
-
-    //!\brief Parse into a a numerical type
+    //!\brief Parse into a numerical type.
     template <typename parsed_field_t>
         requires arithmetic<parsed_field_t>
-    static void parse_field_impl(std::string_view const in, parsed_field_t & parsed_field)
+    static void parse_field_aux(std::string_view const in, parsed_field_t & parsed_field)
     {
         detail::string_to_number(in, parsed_field);
     }
@@ -141,7 +140,7 @@ private:
     void parse_field(tag_type const & /**/, parsed_field_t & parsed_field)
     {
             static_assert(arithmetic<parsed_field_t>/*always false*/,
-                          "Format X does not know how to convert field Y into type Z. Provide different traits or a "
+                          "Format X does not know how to parse field Y into type Z. Provide different traits or a "
                           "custom format handler.");
             //TODO replace X Y and Z with actual strings generated from types.
     }
@@ -149,15 +148,16 @@ private:
     //!\brief Various target types have sane default implementations.
     template <field field_id, typename parsed_field_t>
     void parse_field(tag_t<field_id> const & /**/, parsed_field_t & parsed_field)
-        requires (requires { derived_t::parse_field_impl(std::string_view{}, parsed_field); })
+        requires (requires { derived_t::parse_field_aux(std::string_view{}, parsed_field); })
     {
-        to_derived()->parse_field_impl(get<field_id>(to_derived()->raw_record), parsed_field);
+        to_derived()->parse_field_aux(get<field_id>(to_derived()->raw_record), parsed_field);
     }
     //!\}
 
     /*!\name Parsing record (step 1)
      * \{
      */
+    //!\brief This function delegates to the derived type, but falls back to the implementation above.
     template <field field_id, typename parsed_record_t>
     void parse_record_impl(tag_t<field_id> const & /**/, parsed_record_t & parsed_record)
     {
